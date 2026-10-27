@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#111f35" />
+  <meta name="description" content="簡單持倉管理、自動更新最新可取得的台股收盤價" />
+  <title>持倉日誌｜自動股價與損益</title>
+  <link rel="stylesheet" href="style.css" />
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <div class="layout">
+    <aside class="sidebar">
+      <a class="logo" href="./" aria-label="持倉日誌首頁">
+        <span class="logo-mark">◈</span>
+        <span><b>持倉日誌</b><small>PORTFOLIO LEDGER</small></span>
+      </a>
+      <div class="aside-heading">工作空間</div>
+      <div class="nav-selected"><span class="nav-symbol">▦</span> 我的持倉 <span class="nav-chip">首頁</span></div>
+      <div class="aside-foot">
+        <div class="connection"><span class="live-dot"></span> 本機私人儲存</div>
+        <p>無需 Google 登入。持股資料只存在這台裝置的瀏覽器，GitHub 上不會公開你的持倉。</p>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">MY INVESTMENTS / 持倉管理</div>
+          <h1>我的投資持倉</h1>
+          <p class="subheading">輸入代號、股數與成本，其餘交給自動報價。</p>
+        </div>
+        <div class="head-buttons">
+          <button class="button secondary" id="refreshQuotes" type="button"><span aria-hidden="true">↻</span> 更新股價</button>
+          <button class="button primary" id="newHolding" type="button"><span aria-hidden="true">＋</span> 新增持股</button>
+        </div>
+      </header>
+      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+      <section class="stats" aria-label="投資總覽">
+        <article class="stat">
+          <div class="stat-label">已取得報價的總市值 <span class="muted-icon">↗</span></div>
+          <div class="stat-number" id="totalValue">NT$ —</div>
+          <p class="stat-note" id="totalNote">正在載入持倉</p>
+        </article>
+        <article class="stat">
+          <div class="stat-label">未實現損益</div>
+          <div class="stat-number" id="totalPnl">NT$ —</div>
+          <p class="stat-note" id="pnlNote">依買進均價計算，不含交易費</p>
+        </article>
+        <article class="stat">
+          <div class="stat-label">持有標的</div>
+          <div class="stat-number" id="holdingCount">0 <span class="stat-unit">檔</span></div>
+          <p class="stat-note">台灣上市、上櫃股票及 ETF</p>
+        </article>
+      </section>
+
+      <section class="content-card" aria-label="持倉列表">
+        <div class="card-heading">
+          <div>
+            <h2>持倉明細</h2>
+            <p>自動帶入最新收盤價；未取得資料的股票不會拿 0 元冒充股價。</p>
+          </div>
+          <div class="quote-info"><span id="quoteDot" class="status-dot"></span><span id="quoteStatus">正在確認行情資料…</span></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>股票／ETF</th><th>持有股數</th><th>平均買進成本</th><th>自動股價</th><th>目前市值</th><th>未實現損益</th><th class="actions-title">操作</th></tr></thead>
+            <tbody id="holdingsBody"><tr><td colspan="7" class="empty-cell">正在載入…</td></tr></tbody>
+          </table>
+        </div>
+        <div class="table-footer"><span id="lastSaved">資料保存在本機</span><span>資料來源：臺灣證券交易所／櫃買中心 OpenAPI</span></div>
+      </section>
+
+      <section class="bottom-row">
+        <article class="mini-panel">
+          <span class="mini-icon" aria-hidden="true">◷</span>
+          <div><b>報價說明</b><p>資料是最近交易日的收盤價，不是即時盤中成交價。假日與盤中可能仍顯示上一交易日；請查看每檔標示的日期。</p></div>
+        </article>
+        <article class="mini-panel">
+          <span class="mini-icon" aria-hidden="true">⇅</span>
+          <div><b>資料備份</b><p>換電腦時請先匯出檔案，再到新裝置匯入。</p>
+            <div class="backup-actions"><button class="inline-button" id="exportData" type="button">匯出 JSON</button><button class="inline-button" id="importButton" type="button">匯入備份</button></div>
+          </div>
+        </article>
+      </section>
+      <input type="file" id="importFile" accept=".json,application/json" hidden />
+      <footer>持倉日誌 · 個人投資追蹤工具 · 報價不保證即時；不構成投資建議。</footer>
+    </main>
+  </div>
+
+  <dialog id="holdingDialog" aria-labelledby="dialogTitle">
+    <form id="holdingForm" novalidate>
+      <div class="dialog-top"><div><div class="eyebrow">POSITION DETAILS</div><h2 id="dialogTitle">新增持股</h2></div><button type="button" id="closeDialog" class="close" aria-label="關閉">✕</button></div>
+      <div class="dialog-body">
+        <input type="hidden" id="holdingId" />
+        <div class="input-grid">
+          <label class="field full"><span>股票代號 <em>*</em></span><input id="symbol" required maxlength="12" placeholder="例如 0050、2330、6488" inputmode="text" autocomplete="off" /><small>輸入後自動從市場行情資料查詢，不必輸入現在股價。</small></label>
+          <label class="field"><span>交易市場 <em>*</em></span><select id="market"><option value="TWSE">上市（證交所）</option><option value="TPEX">上櫃（櫃買中心）</option></select></label>
+          <label class="field"><span>持股名稱（選填）</span><input id="holdingName" maxlength="70" placeholder="可留空，自動帶入名稱" /></label>
+          <label class="field"><span>持有股數 <em>*</em></span><input type="number" id="quantity" required min="0.000001" step="any" placeholder="例如 100" /></label>
+          <label class="field"><span>平均買進成本（每股） <em>*</em></span><input type="number" id="cost" required min="0" step="any" placeholder="例如 55.5" /></label>
+        </div>
+        <div class="quote-preview" aria-live="polite">
+          <div><span class="preview-label">自動取得的最新收盤價</span><strong id="previewPrice">請輸入股票代號</strong></div>
+          <small id="previewInfo">報價取自官方每日行情。</small>
+        </div>
+        <p class="form-error" id="formError" role="alert"></p>
+      </div>
+      <div class="dialog-actions"><button type="button" class="button secondary" id="cancelDialog">取消</button><button type="submit" class="button primary" id="submitHolding">儲存持倉</button></div>
+    </form>
+  </dialog>
+</body>
+</html>

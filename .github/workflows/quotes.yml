@@ -1,0 +1,62 @@
+name: 更新行情並發布網站
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+  schedule:
+    # UTC 08:30 = 台灣 16:30，週一至週五；GitHub 定時任務可能延遲
+    - cron: '30 8 * * 1-5'
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: 取得原始碼
+        uses: actions/checkout@v4
+      - name: 設定 Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: 更新台灣證交所及櫃買中心行情
+        id: prices
+        continue-on-error: true
+        run: python tools/update_quotes.py
+      - name: 記錄更新成功的行情
+        if: steps.prices.outcome == 'success'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add quotes/market.json
+          if git diff --cached --quiet; then
+            echo "行情沒有變更"
+          else
+            git commit -m "chore: 更新官方收盤行情"
+            git push
+          fi
+      - name: 設定 GitHub Pages
+        uses: actions/configure-pages@v5
+      - name: 準備公開網站檔案（只公開必要檔案）
+        run: |
+          mkdir -p dist/quotes
+          cp index.html style.css app.js dist/
+          cp quotes/market.json dist/quotes/market.json
+      - name: 打包靜態網站
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: dist
+      - name: 發布網站
+        id: deployment
+        uses: actions/deploy-pages@v4
