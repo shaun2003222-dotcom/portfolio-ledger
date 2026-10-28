@@ -4,7 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="theme-color" content="#11243a">
 <meta name="description" content="多資產持倉管理、年度資產目標、資產配置分析與台股官方收盤行情">
-<title>持倉日誌｜多資產管理與年度目標</title>
+<title>持倉日誌｜多資產管理、配置健檢與自動幣價</title>
 <link rel="stylesheet" href="style.css"><script src="app.js" defer></script>
 </head>
 <body>
@@ -24,7 +24,7 @@
 <main class="main">
 <header class="topbar" id="overview">
   <div><div class="eyebrow">ASSET OVERVIEW / 投資健檢</div><h1>我的資產總覽</h1>
-  <p class="subheading">多類資產整合、官方台股收盤價及年度目標追蹤</p></div>
+  <p class="subheading">台股官方收盤價、加密貨幣市場價格、年度目標與配置健檢</p></div>
   <div class="head-buttons"><button id="refreshQuotes" class="button secondary" type="button">↻ 更新股價</button><button id="newHolding" class="button primary" type="button">＋ 新增資產</button></div>
 </header>
 <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
@@ -50,8 +50,9 @@
   <div id="categoryCards" class="category-cards"></div>
 </section>
 <section class="content-card" id="holdings" aria-label="持倉明細">
- <div class="card-heading"><div><h2>持倉管理</h2><p>台股可自動報價，其餘類別可設定手動價格與幣別。</p></div>
+ <div class="card-heading"><div><h2>持倉管理</h2><p>台股與常見加密貨幣可自動查價；其他資產仍可手動估值。</p></div>
  <div class="quote-info"><span id="quoteDot" class="status-dot"></span><span id="quoteStatus">讀取行情中…</span></div></div>
+ <div class="crypto-status-panel"><div><strong>加密貨幣行情（USD）</strong><p id="cryptoStatus" aria-live="polite">正在確認幣價…</p><small>24 小時市場參考價；非交易所即時成交價。來源：<a href="https://www.coingecko.com/" target="_blank" rel="noopener noreferrer">CoinGecko</a>。短期快取，API 限流或離線可能無法更新。</small></div><button id="refreshCrypto" class="button secondary" type="button">↻ 更新幣價</button></div>
  <div class="filters"><label for="categoryFilter">分類篩選</label><select id="categoryFilter"><option value="all">全部資產</option></select><span id="filteredCount" class="muted"></span></div>
  <div class="table-wrap"><table><thead><tr><th>類別／標的</th><th>持有數量</th><th>平均成本</th><th>最新／手動單價</th><th>估值（台幣）</th><th>未實現損益</th><th class="actions-title">操作</th></tr></thead>
  <tbody id="holdingsBody"><tr><td colspan="7" class="empty-cell">載入中…</td></tr></tbody></table></div>
@@ -96,7 +97,7 @@
  </div>
 </section>
 <section class="bottom-row">
-  <article class="mini-panel"><span class="mini-icon">ℹ</span><div><b>計算規則</b><p>台股／台灣 ETF 採官方最近交易日收盤價；美股、基金、加密貨幣及其他資產價格需自行輸入；匯率由外部來源自動帶入，失敗時可輸入備援值。無有效估值的標的不會算作 0。期貨名目價值僅顯示曝險，不列入總資產或圓餅圖。</p></div></article>
+  <article class="mini-panel"><span class="mini-icon">ℹ</span><div><b>計算規則</b><p>台股／台灣 ETF 採官方最近交易日收盤價；美股、基金、支援的加密貨幣由 CoinGecko 自動報價；未支援幣種和其他資產價格需自行輸入；匯率由外部來源自動帶入，失敗時可輸入備援值。無有效估值的標的不會算作 0。期貨名目價值僅顯示曝險，不列入總資產或圓餅圖。</p></div></article>
   <article class="mini-panel"><span class="mini-icon">⇅</span><div><b>私人資料備份</b><p>持倉、年度目標及匯率快取保存在當前瀏覽器；不同裝置需要手動匯入備份。</p><div class="backup-actions"><button type="button" class="inline-button" id="exportData">匯出 JSON</button><button type="button" class="inline-button" id="importButton">匯入 JSON</button></div></div></article>
 </section>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
@@ -108,8 +109,8 @@
  <div class="dialog-body"><input type="hidden" id="holdingId">
    <div class="input-grid">
      <label class="field"><span>資產分類 <em>*</em></span><select id="category" required></select></label>
-     <label class="field"><span>報價方式</span><select id="market"><option value="TWSE">台灣上市（官方自動）</option><option value="TPEX">台灣上櫃（官方自動）</option><option value="MANUAL">自行輸入價格</option></select></label>
-     <label class="field"><span>標的代號</span><input id="symbol" maxlength="28" placeholder="0050、AAPL、BTC 等" autocomplete="off"><small>自動報價需使用有效台股代號；手動報價可自行命名。</small></label>
+     <label class="field"><span>報價方式</span><select id="market"><option value="TWSE">台灣上市（官方自動）</option><option value="TPEX">台灣上櫃（官方自動）</option><option value="CRYPTO">加密貨幣（CoinGecko 自動）</option><option value="MANUAL">自行輸入價格</option></select></label>
+     <label class="field"><span>標的代號</span><input id="symbol" maxlength="28" placeholder="0050、AAPL、BTC 等" autocomplete="off"><small>台股須填有效代號；加密貨幣自動價目前支援常見幣種。</small><small id="cryptoSymbolHint" hidden>支援 BTC、ETH、SOL、XRP、BNB、DOGE、ADA、USDT、USDC、LINK 等 27 種。買進成本請以 USD／幣填寫。其他代號可改用手動價格。</small></label>
      <label class="field"><span>資產名稱</span><input id="holdingName" maxlength="70" placeholder="例如 台積電、比特幣、某某基金"></label>
      <label class="field"><span id="quantityLabel">股數／單位數 <em>*</em></span><input type="number" id="quantity" required min="0.000001" step="any" placeholder="例如 100"></label>
      <label class="field cost-field"><span>平均買進成本（每單位）</span><input id="cost" type="number" required min="0" step="any" placeholder="例如 55"></label>
@@ -119,7 +120,7 @@
      <label class="field futures-only"><span>合約乘數</span><input id="multiplier" type="number" min="0.000001" step="any" value="1"><small>每一價格點對應的貨幣金額</small></label>
      <label class="field futures-only"><span>每口保證金（參考資訊）</span><input id="margin" type="number" min="0" step="any" placeholder="不列入資產總額"></label>
    </div>
-   <div class="quote-preview" aria-live="polite"><div><span class="preview-label">目前使用的價格</span><strong id="previewPrice">請輸入代號</strong></div><small id="previewInfo">台股會依官方報價更新；其他類別使用手動價格。</small></div>
+   <div class="quote-preview" aria-live="polite"><div><span class="preview-label">目前使用的價格</span><strong id="previewPrice">請輸入代號</strong></div><small id="previewInfo">台股及常見加密貨幣自動查價，其餘資產可手動填價。</small></div>
    <p class="form-error" id="formError" role="alert"></p>
  </div>
  <div class="dialog-actions"><button type="button" class="button secondary" id="cancelDialog">取消</button><button type="submit" class="button primary" id="submitHolding">儲存資產</button></div>

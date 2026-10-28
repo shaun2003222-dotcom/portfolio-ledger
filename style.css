@@ -48,3 +48,14 @@
 .advice-cautions{font-size:11px;line-height:1.65;color:#76899b;margin-top:16px}
 .advice-cautions p{margin:5px 0;padding-left:13px;border-left:2px solid #d8e8e5}
 @media(max-width:690px){.advice-control-bar,.advice-result{padding-left:18px;padding-right:18px}.advice-summary{grid-template-columns:1fr}.advice-cards{grid-template-columns:1fr}.advice-control-bar .field{flex-basis:100%}.advice-control-bar .button{width:100%}}
+
+/* Crypto quote status / manual fallback */
+.crypto-status-panel{display:flex;align-items:center;justify-content:space-between;gap:18px;border-top:1px solid #eaf0f1;background:#fbfcfd;padding:17px 27px;margin:0 0 18px}
+.crypto-status-panel strong{display:block;font-size:13px;color:#35576c}
+.crypto-status-panel p{font-size:12px;color:#637f8f;margin:5px 0;line-height:1.6}
+.crypto-status-panel small{display:block;font-size:11px;color:#8499a4;line-height:1.7}
+.crypto-status-panel a{color:#268d7e}
+.crypto-status-panel .button{white-space:nowrap;flex-shrink:0}
+#cryptoSymbolHint{color:#5b817d;line-height:1.65}
+#cryptoSymbolHint[hidden]{display:none}
+@media(max-width:690px){.crypto-status-panel{display:block;padding:16px 18px}.crypto-status-panel .button{width:100%;margin-top:12px}}

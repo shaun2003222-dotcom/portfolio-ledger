@@ -4,6 +4,21 @@ const STORAGE_KEY = 'portfolio-ledger-holdings-v1';
 const GOAL_KEY = 'portfolio-ledger-goals-v2';
 const FX_CACHE_KEY = 'portfolio-ledger-fx-auto-v1';
 const ADVICE_BUDGET_KEY = 'portfolio-ledger-advice-budget-v1';
+const CRYPTO_CACHE_KEY = 'portfolio-ledger-crypto-quotes-v1';
+const CRYPTO_CACHE_TTL = 5 * 60 * 1000;
+const CRYPTO_FALLBACK_TTL = 24 * 60 * 60 * 1000;
+// 使用 CoinGecko 唯一 ID，避免同名代幣被誤認。要新增幣種可擴充這裡。
+const CRYPTO_COINS = Object.freeze({
+ BTC:['bitcoin','比特幣'],ETH:['ethereum','以太幣'],SOL:['solana','Solana'],
+ XRP:['ripple','XRP'],BNB:['binancecoin','BNB'],ADA:['cardano','Cardano'],
+ DOGE:['dogecoin','Dogecoin'],USDT:['tether','Tether'],USDC:['usd-coin','USDC'],
+ TRX:['tron','TRON'],LINK:['chainlink','Chainlink'],AVAX:['avalanche-2','Avalanche'],
+ LTC:['litecoin','Litecoin'],BCH:['bitcoin-cash','Bitcoin Cash'],DOT:['polkadot','Polkadot'],
+ XLM:['stellar','Stellar'],SUI:['sui','Sui'],TON:['the-open-network','Toncoin'],
+ SHIB:['shiba-inu','Shiba Inu'],UNI:['uniswap','Uniswap'],PEPE:['pepe','Pepe'],
+ APT:['aptos','Aptos'],NEAR:['near','NEAR Protocol'],ATOM:['cosmos','Cosmos'],
+ ARB:['arbitrum','Arbitrum'],OP:['optimism','Optimism'],DAI:['dai','DAI']
+});
 const FX_FIAT_MAX_AGE = 24 * 60 * 60 * 1000;
 const FX_USDT_MAX_AGE = 15 * 60 * 1000;
 const FX_STALE_LIMIT = 14 * 24 * 60 * 60 * 1000;
@@ -18,14 +33,17 @@ const CATEGORIES = [
   {id:'futures',name:'期貨（名目曝險另列）',short:'期貨',color:'#dd7559'}
 ];
 const $ = id => document.getElementById(id);
-const state = {holdings:[],goals:defaultGoals(),quotes:{},markets:{},generatedAt:null,priceLoading:false,priceError:'',editing:null,fxAuto:{fiat:null,usdt:null},fxLoading:false,fxErrors:[]};
+const state = {holdings:[],goals:defaultGoals(),quotes:{},markets:{},generatedAt:null,priceLoading:false,priceError:'',editing:null,fxAuto:{fiat:null,usdt:null},fxLoading:false,fxErrors:[],cryptoQuotes:{},cryptoFetchedAt:0,cryptoLoading:false,cryptoError:''};
 function defaultGoals(){return {year:Number(new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'}).slice(0,4)),amount:null,contributionGoal:null,contributionActual:null,fx:{USD:null,EUR:null,JPY:null,USDT:null},targets:{}};}
 const number=(v,d=2)=>Number(v).toLocaleString('zh-TW',{maximumFractionDigits:d});
 const money=(v,d=0)=>'NT$ '+number(v,d);
 const escapeHTML=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const localTime=()=>new Date().toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false});
 const localDate=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'});
-const currencyText=(amount,ccy)=>({TWD:'NT$',USD:'US$',EUR:'€',JPY:'¥',USDT:'USDT '})[ccy]+number(amount,ccy==='JPY'?0:4);
+const currencyText=(amount,ccy)=>{
+ const n=Number(amount); const digits=ccy==='JPY'?0:(n>0&&n<0.01?10:n<1?8:4);
+ return ({TWD:'NT$',USD:'US$',EUR:'€',JPY:'¥',USDT:'USDT '})[ccy]+number(n,digits);
+};
 const categoryById=id=>CATEGORIES.find(c=>c.id===id)||CATEGORIES[6];
 const createId=()=>globalThis.crypto&&crypto.randomUUID?crypto.randomUUID():Date.now()+'-'+Math.random().toString(36).slice(2);
 function msg(text,type=''){const n=$('notice');n.textContent=text;n.className='notice '+type;n.hidden=!text;}
@@ -33,15 +51,17 @@ function finiteMaybe(value){if(value===''||value===null||value===undefined)retur
 function normalizeHolding(raw){
   if(!raw||typeof raw!=='object')return null;
   const category=CATEGORIES.some(c=>c.id===raw.category)?raw.category:'tw';
-  const market=['TWSE','TPEX','MANUAL'].includes(raw.market)?raw.market:'MANUAL';
+  const market=['TWSE','TPEX','MANUAL','CRYPTO'].includes(raw.market)?raw.market:'MANUAL';
   const symbol=String(raw.symbol||'').trim().toUpperCase().slice(0,28);
   const name=String(raw.name||'').trim().slice(0,70);
   const quantity=finiteMaybe(raw.quantity),cost=category==='cash'?1:finiteMaybe(raw.cost);
   if(!symbol&&!name)return null;
-  if(market!=='MANUAL'&&!/^[0-9A-Z]{4,12}$/.test(symbol))return null;
+  if(['TWSE','TPEX'].includes(market)&&!/^[0-9A-Z]{4,12}$/.test(symbol))return null;
+  if(market==='CRYPTO'&&(category!=='crypto'||!Object.hasOwn(CRYPTO_COINS,symbol)))return null;
   if(quantity===null||quantity<=0||cost===null||cost<0)return null;
   let currency=['TWD','USD','EUR','JPY','USDT'].includes(raw.currency)?raw.currency:'TWD';
-  if(market!=='MANUAL')currency='TWD';
+  if(['TWSE','TPEX'].includes(market))currency='TWD';
+  if(market==='CRYPTO')currency='USD';
   const manualPrice=category==='cash'?1:finiteMaybe(raw.manualPrice);
   const multiplier=finiteMaybe(raw.multiplier);
   if(category==='futures'&&(!multiplier||multiplier<=0))return null;
@@ -66,7 +86,63 @@ function persist(){
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state.holdings));localStorage.setItem(GOAL_KEY,JSON.stringify(state.goals));$('lastSaved').textContent='本機已儲存 · '+localTime();return true;}
   catch{msg('資料儲存失敗，請先匯出 JSON 備份，確認瀏覽器是否允許本機儲存。','error');return false;}
 }
-function quoteFor(h){const q=state.quotes[h.market+':'+h.symbol];return q&&Number.isFinite(Number(q.price))&&Number(q.price)>0?q:null;}
+function quoteFor(h){
+  const q=h.market==='CRYPTO'?state.cryptoQuotes[h.symbol]:state.quotes[h.market+':'+h.symbol];
+  return q&&Number.isFinite(Number(q.price))&&Number(q.price)>0?q:null;
+}
+function cryptoDisplayTime(timestamp){
+  const ms=Number(timestamp);
+  return ms>0?new Date(ms).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'時間未知';
+}
+function loadCryptoCache(){
+  try{
+    const cache=JSON.parse(localStorage.getItem(CRYPTO_CACHE_KEY)||'null');
+    if(!cache||!Number.isFinite(Number(cache.fetchedAt))||Date.now()-cache.fetchedAt>CRYPTO_FALLBACK_TTL)return;
+    state.cryptoFetchedAt=cache.fetchedAt;
+    state.cryptoQuotes=Object.fromEntries(Object.entries(cache.quotes||{}).filter(([symbol,q])=>
+      Object.hasOwn(CRYPTO_COINS,symbol)&&q&&Number(q.price)>0&&Number.isFinite(Number(q.price))&&Number(q.updatedAt)>0));
+  }catch{/* 快取錯誤不影響其他投資資料 */}
+}
+function renderCryptoStatus(){
+  const node=$('cryptoStatus');if(!node)return;
+  const count=Object.keys(state.cryptoQuotes).length;
+  const older=state.cryptoFetchedAt&&Date.now()-state.cryptoFetchedAt>CRYPTO_CACHE_TTL;
+  const status=state.cryptoLoading?'正在查詢加密貨幣市場價格…':
+    state.cryptoError?`更新失敗：${state.cryptoError}${count?'；仍顯示快取行情，請留意價格時間':''}`:
+    count?`已取得 ${count} 種幣價 · ${cryptoDisplayTime(state.cryptoFetchedAt)}${older?'（快取）':''}`:'尚未取得幣價';
+  node.textContent=status;
+  $('refreshCrypto').disabled=state.cryptoLoading;
+}
+async function refreshCryptoPrices(force=false){
+  if(state.cryptoLoading)return;
+  if(!force&&state.cryptoFetchedAt&&Date.now()-state.cryptoFetchedAt<CRYPTO_CACHE_TTL){renderCryptoStatus();return;}
+  state.cryptoLoading=true;state.cryptoError='';renderCryptoStatus();
+  try{
+    const ids=[...new Set(Object.values(CRYPTO_COINS).map(x=>x[0]))];
+    const url='https://api.coingecko.com/api/v3/simple/price?ids='+encodeURIComponent(ids.join(','))+
+      '&vs_currencies=usd&include_last_updated_at=true&include_24hr_change=true';
+    const data=await fetchJsonWithTimeout(url);
+    if(!data||typeof data!=='object')throw Error('行情格式不正確');
+    const next={};
+    for(const [symbol,[id,name]] of Object.entries(CRYPTO_COINS)){
+      const entry=data[id];const value=Number(entry?.usd);
+      const stamp=Number(entry?.last_updated_at)*1000;
+      // 只有有效價格與資料時間的幣種才納入；不推測缺失價格。
+      if(Number.isFinite(value)&&value>0&&Number.isFinite(stamp)&&stamp>0&&Date.now()-stamp<CRYPTO_FALLBACK_TTL){
+        next[symbol]={price:value,name,updatedAt:stamp,source:'CoinGecko',change24h:Number.isFinite(Number(entry.usd_24h_change))?Number(entry.usd_24h_change):null};
+      }
+    }
+    if(!Object.keys(next).length)throw Error('沒有取得有效幣價');
+    state.cryptoQuotes=next;state.cryptoFetchedAt=Date.now();
+    try{localStorage.setItem(CRYPTO_CACHE_KEY,JSON.stringify({fetchedAt:state.cryptoFetchedAt,quotes:next}));}catch{}
+  }catch(err){
+    state.cryptoError=err.name==='AbortError'?'查詢逾時':err.message||'無法連線';
+    // 過久的快取不能當作現價；缺報價的資產不計入可估值資產。
+    if(state.cryptoFetchedAt&&Date.now()-state.cryptoFetchedAt>CRYPTO_FALLBACK_TTL){state.cryptoQuotes={};state.cryptoFetchedAt=0;}
+  }finally{
+    state.cryptoLoading=false;renderCryptoStatus();render();
+  }
+}
 // 當前使用來源：自動參考匯率優先；老版本手填值只在無自動資料時備援。
 function autoFxRate(ccy){
  if(ccy==='TWD')return 1;
@@ -166,8 +242,11 @@ function aggregate(){
 }
 function renderRow(x){
   const h=x.h,c=categoryById(h.category),shownName=h.name||x.quote?.name||h.symbol;
-  const marketTag=h.market==='TWSE'?'上市':h.market==='TPEX'?'上櫃':'手動';
-  const priceCell=x.price!==null&&x.price>0?`${currencyText(x.price,h.currency)}<small>${escapeHTML(x.quote?.date||'自行輸入')} · ${h.market==='MANUAL'?'手動':'收盤'}</small>`:'—<small>尚無有效報價</small>';
+  const marketTag=h.market==='TWSE'?'上市':h.market==='TPEX'?'上櫃':h.market==='CRYPTO'?'幣價自動':'手動';
+  const quoteTime=h.market==='CRYPTO'&&x.quote?cryptoDisplayTime(x.quote.updatedAt):escapeHTML(x.quote?.date||'自行輸入');
+  const quoteType=h.market==='CRYPTO'?'24h 市場參考價':h.market==='MANUAL'?'手動':'收盤';
+  const change=h.market==='CRYPTO'&&Number.isFinite(x.quote?.change24h)?`<small class="${x.quote.change24h>=0?'positive':'negative'}">24h ${x.quote.change24h>=0?'+':''}${number(x.quote.change24h,2)}%</small>`:'';
+  const priceCell=x.price!==null&&x.price>0?`${currencyText(x.price,h.currency)}<small>${quoteTime} · ${quoteType}</small>${change}`:'—<small>尚無有效報價</small>';
   const estimated=h.category==='futures'? (x.valid?`<b>${money(x.exposure)}</b><small>名目曝險，不列入總資產</small>`:'—'):(x.valid?`<b>${money(x.value)}</b>`:'—<small>'+escapeHTML(x.reason)+'</small>');
   const klass=x.pnl>0?'positive':x.pnl<0?'negative':'';
   const base=h.category==='futures'?h.quantity*h.multiplier*h.cost*Number(x.fx||0):h.quantity*h.cost*Number(x.fx||0);
@@ -290,7 +369,7 @@ function render(){
  const dot=$('quoteDot');dot.className='status-dot '+(state.priceLoading?'':state.priceError?'error':Object.keys(state.quotes).length?'ready':'');
  const statuses=Object.entries(state.markets).filter(([,v])=>v&&v.date).map(([k,v])=>(k==='TWSE'?'上市':'上櫃')+' '+v.date);
  $('quoteStatus').textContent=state.priceLoading?'正在取得官方行情…':state.priceError?'台股報價讀取失敗':statuses.length?'台股行情 · '+statuses.join(' / '):'尚未下載台股報價';
- renderPie(agg);renderCategories(agg);renderGoals(agg);renderAdvice(agg);previewPrice();
+ renderPie(agg);renderCategories(agg);renderGoals(agg);renderAdvice(agg);renderCryptoStatus();previewPrice();
 }
 function parseQuotes(data){
  if(!data||typeof data!=='object'||!data.quotes||typeof data.quotes!=='object')throw Error('行情檔格式不正確');
@@ -307,19 +386,25 @@ async function refreshQuotes(){
  finally{state.priceLoading=false;$('refreshQuotes').disabled=false;render();}
 }
 function updateFormFields(){
- const c=$('category').value,market=$('market'),isCash=c==='cash',isFuture=c==='futures',isAuto=market.value!=='MANUAL';
- if(isFuture||isCash||!['tw','fund','bond','other'].includes(c))market.value='MANUAL';
+ const c=$('category').value,market=$('market'),isCash=c==='cash',isFuture=c==='futures';
+ const allowed=c==='crypto'?['CRYPTO','MANUAL']:['tw','fund','bond','other'].includes(c)?['TWSE','TPEX','MANUAL']:['MANUAL'];
+ for(const option of market.options)option.disabled=!allowed.includes(option.value);
+ if(!allowed.includes(market.value))market.value=c==='crypto'?'CRYPTO':c==='tw'?'TWSE':'MANUAL';
+ market.disabled=allowed.length===1;
+ const isAuto=market.value!=='MANUAL';
  document.querySelectorAll('.futures-only').forEach(el=>el.hidden=!isFuture);
- market.disabled=isFuture||isCash||!['tw','fund','bond','other'].includes(c);
- $('manualPriceField').hidden=market.value!=='MANUAL'||isCash;
- $('currency').disabled=market.value!=='MANUAL';
- if(market.value!=='MANUAL')$('currency').value='TWD';
+ $('manualPriceField').hidden=isAuto||isCash;
+ $('currency').disabled=isAuto;
+ if(['TWSE','TPEX'].includes(market.value))$('currency').value='TWD';
+ if(market.value==='CRYPTO')$('currency').value='USD';
  if(isCash){$('cost').value=1;$('manualPrice').value=1;}
- $('quantityLabel').innerHTML=isCash?'現金金額（原幣） <em>*</em>':isFuture?'持有口數 <em>*</em>':'股數／單位數 <em>*</em>';
+ $('quantityLabel').innerHTML=isCash?'現金金額（原幣） <em>*</em>':isFuture?'持有口數 <em>*</em>':c==='crypto'?'持有幣數 <em>*</em>':'股數／單位數 <em>*</em>';
  $('cost').required=!isCash;
  if(c==='us'&&$('currency').value==='TWD'&&!state.editing)$('currency').value='USD';
- if(c==='crypto'&&$('currency').value==='TWD'&&!state.editing)$('currency').value='USD';
- $('previewPrice').textContent='';previewPrice();
+ if(c==='crypto'&&market.value==='MANUAL'&&$('currency').value==='TWD'&&!state.editing)$('currency').value='USD';
+ $('symbol').placeholder=c==='crypto'?'例如 BTC、ETH、SOL、XRP':'0050、AAPL、BTC 等';
+ $('cryptoSymbolHint').hidden=c!=='crypto';
+ previewPrice();
 }
 function openDialog(item=null){
  $('holdingForm').reset();state.editing=item?item.id:null;$('formError').textContent='';$('dialogTitle').textContent=item?'編輯資產':'新增資產';
@@ -338,20 +423,23 @@ function autoMarket(){
 function previewPrice(){
  if(!$('symbol')||!$('previewPrice'))return;
  const category=$('category').value,market=$('market').value,sym=$('symbol').value.trim().toUpperCase();
- const q=state.quotes[market+':'+sym];const currency=$('currency').value;
+ const q=market==='CRYPTO'?state.cryptoQuotes[sym]:state.quotes[market+':'+sym];const currency=$('currency').value;
  if(category==='cash'){$('previewPrice').textContent='現金面值';$('previewInfo').textContent='金額會依你設定的匯率換算成新台幣。';return;}
  if(market==='MANUAL'){
  const v=finiteMaybe($('manualPrice').value);$('previewPrice').textContent=v!==null&&v>0?currencyText(v,currency):'尚未輸入價格';
  $('previewInfo').textContent=category==='futures'?'期貨僅估算浮動損益及名目曝險，不納入資產配置。':'手動價格不會隨台股 Actions 自動更新。';return;
  }
- $('previewPrice').textContent=q&&Number(q.price)>0?currencyText(q.price,'TWD'):'暫無報價';
- $('previewInfo').textContent=q?`${q.date||'未知日期'} 收盤 · ${q.name||''}`:'請確認代號、上市上櫃市場或行情更新時間。';
+ $('previewPrice').textContent=q&&Number(q.price)>0?currencyText(q.price,market==='CRYPTO'?'USD':'TWD'):'暫無報價';
+ $('previewInfo').textContent=market==='CRYPTO'?
+   (q?`${cryptoDisplayTime(q.updatedAt)} · CoinGecko 市場參考價 · ${q.name}`:
+     Object.hasOwn(CRYPTO_COINS,sym)?'幣價尚未取得，可按「更新幣價」再試。':'目前不支援此代號；請切換手動價格。'):
+   (q?`${q.date||'未知日期'} 收盤 · ${q.name||''}`:'請確認代號、上市上櫃市場或行情更新時間。');
 }
 function saveHolding(e){
  e.preventDefault();$('formError').textContent='';
  const c=$('category').value,isCash=c==='cash';
  const h=normalizeHolding({id:$('holdingId').value||createId(),category:c,market:$('market').value,name:$('holdingName').value,symbol:$('symbol').value,quantity:$('quantity').value,cost:isCash?1:$('cost').value,manualPrice:isCash?1:$('manualPrice').value,currency:$('currency').value,multiplier:$('multiplier').value,margin:$('margin').value,direction:$('direction').value});
- if(!h){$('formError').textContent='請填寫名稱或代號、正數數量、有效成本；期貨請填合約乘數。';return;}
+ if(!h){$('formError').textContent=$('market').value==='CRYPTO'?'目前不支援這個幣種代號，請選擇支援的幣種，或改選「自行輸入價格」。':'請填寫名稱或代號、正數數量、有效成本；期貨請填合約乘數。';return;}
  const same=state.holdings.some(x=>x.id!==h.id&&x.category===h.category&&x.market===h.market&&x.symbol===h.symbol&&x.symbol);
  if(same){$('formError').textContent='這筆標的已存在，請編輯原持倉。';return;}
  const old=state.holdings.findIndex(x=>x.id===h.id);if(old>=0)state.holdings[old]=h;else state.holdings.push(h);
@@ -398,21 +486,23 @@ async function importBackup(e){
 function init(){
  for(const c of CATEGORIES){$('category').insertAdjacentHTML('beforeend',`<option value="${c.id}">${escapeHTML(c.name)}</option>`);$('categoryFilter').insertAdjacentHTML('beforeend',`<option value="${c.id}">${escapeHTML(c.name)}</option>`);}
  $('targetPercentInputs').innerHTML=CATEGORIES.filter(c=>c.id!=='futures').map(c=>`<label class="field"><span><i class="input-dot" style="background:${c.color}"></i>${escapeHTML(c.name)}（%）</span><input id="target_${c.id}" type="number" min="0" max="100" step="0.1" placeholder="選填"></label>`).join('');
- readSaved();loadFxCache();fillGoalForm();
+ readSaved();loadFxCache();loadCryptoCache();fillGoalForm();
  try{const saved=finiteMaybe(localStorage.getItem(ADVICE_BUDGET_KEY));if(saved!==null&&saved>=0&&saved<=1e12)$('adviceBudget').value=saved;}
  catch{/* storage blocked */}
  render();
- $('newHolding').addEventListener('click',()=>openDialog());$('refreshQuotes').addEventListener('click',refreshQuotes);
+ $('newHolding').addEventListener('click',()=>openDialog());$('refreshQuotes').addEventListener('click',()=>{refreshQuotes();refreshCryptoPrices(true);});
+ $('refreshCrypto').addEventListener('click',()=>refreshCryptoPrices(true));
  $('categoryFilter').addEventListener('change',render);$('holdingsBody').addEventListener('click',tableAction);
  $('closeDialog').addEventListener('click',()=>$('holdingDialog').close());$('cancelDialog').addEventListener('click',()=>$('holdingDialog').close());
  $('holdingForm').addEventListener('submit',saveHolding);
- $('category').addEventListener('change',()=>{if($('category').value==='tw')$('market').value='TWSE';else $('market').value='MANUAL';updateFormFields();});
+ $('category').addEventListener('change',()=>{if($('category').value==='tw')$('market').value='TWSE';else if($('category').value==='crypto')$('market').value='CRYPTO';else $('market').value='MANUAL';updateFormFields();});
  $('market').addEventListener('change',updateFormFields);$('symbol').addEventListener('input',autoMarket);
  $('manualPrice').addEventListener('input',previewPrice);$('currency').addEventListener('change',previewPrice);
  $('goalForm').addEventListener('submit',saveGoals);$('refreshFx').addEventListener('click',()=>refreshFx(true));$('exportData').addEventListener('click',exportBackup);
  $('calculateAdvice').addEventListener('click',()=>{try{localStorage.setItem(ADVICE_BUDGET_KEY,$('adviceBudget').value);}catch{}renderAdvice(aggregate());});
  $('adviceBudget').addEventListener('change',()=>{try{localStorage.setItem(ADVICE_BUDGET_KEY,$('adviceBudget').value);}catch{}renderAdvice(aggregate());});
  $('importButton').addEventListener('click',()=>$('importFile').click());$('importFile').addEventListener('change',importBackup);
- refreshQuotes();refreshFx();
+ refreshQuotes();refreshFx();refreshCryptoPrices();
+ setInterval(()=>refreshCryptoPrices(),CRYPTO_CACHE_TTL);
 }
 init();
