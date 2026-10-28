@@ -59,3 +59,45 @@
 #cryptoSymbolHint{color:#5b817d;line-height:1.65}
 #cryptoSymbolHint[hidden]{display:none}
 @media(max-width:690px){.crypto-status-panel{display:block;padding:16px 18px}.crypto-status-panel .button{width:100%;margin-top:12px}}
+
+/* Menu-based page switch and account UI */
+.page-view[hidden]{display:none!important}
+.side-menu a.nav-selected{background:#1b3350;border-left:3px solid #67d0b1;border-radius:12px;color:white}
+.side-menu a.side-link{border-left:3px solid transparent}
+.side-menu a{transition:background .16s,color .16s}
+.sidebar-user{display:flex;align-items:center;gap:10px;margin:28px 4px 0;padding:14px 8px;background:#1b334c;border:1px solid #34536e;border-radius:13px}
+.user-avatar{width:35px;height:35px;border-radius:12px;background:#397f7b;color:#fff;display:grid;place-items:center;font-size:13px;font-weight:850;flex:none}
+.user-details{min-width:0;flex:1}
+.user-details strong,.user-details small{display:block;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-details strong{font-size:12px}.user-details small{font-size:10px;color:#a5c1ce}
+.sidebar-account-button{border:1px solid #51728b;background:transparent;color:#dafff0;border-radius:9px;padding:7px 9px;font-size:11px;font-weight:750}
+.sidebar-account-button:hover{background:#2c526d}
+.auth-gate[hidden]{display:none!important}
+.auth-gate{position:fixed;inset:0;z-index:120;display:grid;grid-template-columns:minmax(320px,1fr) minmax(360px,1fr);background:#fff;overflow:auto}
+.auth-hero{background:radial-gradient(circle at 12% 5%,#2f5d66 0,transparent 38%),linear-gradient(145deg,#112439,#0e2631 70%,#13453e);color:#f0f8fc;padding:clamp(28px,5vw,70px);display:flex;flex-direction:column;min-height:100vh}
+.auth-brand{font-size:19px;font-weight:850;display:flex;align-items:center;gap:12px}.auth-brand small{font-size:9px;letter-spacing:2px;color:#92c9bc}
+.auth-hero-body{margin:auto 0;max-width:580px}.auth-hero-body .eyebrow{color:#8ad5bc}.auth-hero-body h2{font-size:clamp(36px,4vw,59px);line-height:1.22;letter-spacing:-1.8px;margin:18px 0 24px}.auth-hero-body p{color:#b3cbd5;font-size:15px;max-width:440px;line-height:1.85}
+.auth-features{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-top:39px;color:#c1f3e0;font-size:12px}
+.auth-hero-foot{color:#8aa9b8;font-size:12px}
+.auth-form-side{position:relative;display:grid;place-items:center;padding:45px 26px}.auth-panel{width:min(100%,430px)}
+.auth-close{position:absolute;top:22px;right:26px;border:1px solid #e5ebef;background:#fff;border-radius:9px;padding:9px 12px;color:#49647a}
+.auth-kicker{font-size:11px;color:#208576;letter-spacing:2px;font-weight:800}.auth-panel h2{font-size:30px;color:#173049;letter-spacing:-1px;margin:14px 0}
+.auth-lead{font-size:13px;color:#788a9b;line-height:1.85;margin-bottom:30px}
+.auth-google-button,.auth-guest-button{width:100%;border-radius:12px;padding:14px 18px;font-weight:780;font-size:14px}
+.auth-google-button{background:#17384c;color:white;border:1px solid #17384c;display:flex;justify-content:center;align-items:center;gap:12px}
+.auth-google-button:disabled{background:#dee7ec;color:#6b8190;border-color:#dee7ec;cursor:not-allowed}
+.google-g{background:#fff;color:#4285f4;display:grid;place-items:center;border-radius:50%;font-weight:900;width:24px;height:24px;font-size:18px}
+.auth-guest-button{background:#fff;color:#2e5868;border:1px solid #dae3eb;margin-top:12px}
+.auth-guest-button:hover{background:#f4f9fa}
+.auth-setup-note{font-size:12px;line-height:1.65;color:#8c9aa6;margin-top:24px}
+.auth-privacy{font-size:11px;line-height:1.7;color:#94a3af;border-top:1px solid #eaf0f3;margin-top:28px;padding-top:19px}
+.auth-error{background:#fff3f4;border:1px solid #eecfd4;border-radius:10px;color:#ad4f58;padding:12px;font-size:12px;margin-bottom:18px}
+.auth-error[hidden],.auth-transfer[hidden],.auth-user-card[hidden]{display:none!important}
+.auth-user-card{background:#eef8f5;border-radius:12px;padding:17px;color:#286f65;font-size:14px;margin-bottom:18px;overflow-wrap:anywhere}
+.auth-transfer{padding:18px;border:1px solid #cce7db;background:#f2faf5;border-radius:13px;margin-top:20px}
+.auth-transfer b{font-size:14px;color:#155b4c}.auth-transfer p{font-size:12px;line-height:1.75;color:#506e61}
+.auth-transfer .button{width:100%;margin-top:9px}
+body.account-loading .main{pointer-events:none;opacity:.65}
+@media(max-width:1000px){.sidebar-user{margin:0 0 0 auto;max-width:260px;min-width:190px}.sidebar{flex-wrap:wrap}.aside-foot{display:none}}
+@media(max-width:690px){.sidebar{align-items:stretch}.sidebar-user{margin:4px 0 0;max-width:none}.side-menu{overflow-x:auto;scrollbar-width:thin;white-space:nowrap}.side-menu a{flex:none}.auth-gate{grid-template-columns:1fr}.auth-hero{min-height:260px;padding:26px 24px}.auth-hero-body{margin:30px 0 5px}.auth-hero-body h2{font-size:29px;margin:10px 0}.auth-hero-body p{font-size:12px}.auth-features{display:none}.auth-hero-foot{display:none}.auth-form-side{padding:48px 24px}.auth-panel h2{font-size:26px}}
+body.auth-open{overflow:hidden}

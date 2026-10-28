@@ -5,7 +5,15 @@
 <meta name="theme-color" content="#11243a">
 <meta name="description" content="多資產持倉管理、年度資產目標、資產配置分析與台股官方收盤行情">
 <title>持倉日誌｜多資產管理、配置健檢與自動幣價</title>
-<link rel="stylesheet" href="style.css"><script src="app.js" defer></script>
+<link rel="stylesheet" href="style.css">
+<!-- Firebase configuration is optional. Guest mode works without it. -->
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" defer></script>
+<script src="firebase-config.js" defer></script>
+<script src="account.js" defer></script>
+<script src="app.js" defer></script>
+<script src="navigation.js" defer></script>
 </head>
 <body>
 <div class="layout">
@@ -13,21 +21,27 @@
   <a class="logo" href="./"><span class="logo-mark">◈</span><span><b>持倉日誌</b><small>PORTFOLIO LEDGER</small></span></a>
   <div class="aside-heading">工作空間</div>
   <nav aria-label="主要導覽" class="side-menu">
-    <a class="nav-selected" href="#overview"><span class="nav-symbol">▦</span> 資產總覽</a>
-    <a class="side-link" href="#holdings"><span class="nav-symbol">≡</span> 持倉管理</a>
-    <a class="side-link" href="#goals"><span class="nav-symbol">◎</span> 年度目標</a>
-    <a class="side-link" href="#advice"><span class="nav-symbol">✦</span> 下一筆投入</a>
+    <a class="nav-selected" data-nav="overview" href="#overview"><span class="nav-symbol">▦</span> 資產總覽</a>
+    <a class="side-link" data-nav="holdings" href="#holdings"><span class="nav-symbol">≡</span> 持倉管理</a>
+    <a class="side-link" data-nav="goals" href="#goals"><span class="nav-symbol">◎</span> 年度目標</a>
+    <a class="side-link" data-nav="advice" href="#advice"><span class="nav-symbol">✦</span> 下一筆投入</a>
   </nav>
-  <div class="aside-foot"><div class="connection"><span class="live-dot"></span> 私人瀏覽器儲存</div>
-    <p>持倉及目標僅存在目前瀏覽器，不會上傳到 GitHub。換裝置請先匯出 JSON 備份。</p></div>
+  <div class="sidebar-user">
+    <div class="user-avatar" id="userAvatar">訪</div>
+    <div class="user-details"><strong id="sidebarUserName">訪客模式</strong><small id="sidebarUserStatus">資料僅存於此瀏覽器</small></div>
+    <button id="openAccount" class="sidebar-account-button" type="button">登入</button>
+  </div>
+  <div class="aside-foot"><div class="connection"><span class="live-dot"></span> <span id="storageMode">訪客本機儲存</span></div>
+    <p>登入後可使用私人雲端同步（需完成 Firebase 設定）。訪客模式資料僅在本機，記得匯出備份。</p></div>
 </aside>
 <main class="main">
 <header class="topbar" id="overview">
-  <div><div class="eyebrow">ASSET OVERVIEW / 投資健檢</div><h1>我的資產總覽</h1>
-  <p class="subheading">台股官方收盤價、加密貨幣市場價格、年度目標與配置健檢</p></div>
+  <div><div class="eyebrow" id="pageEyebrow">ASSET OVERVIEW / 投資健檢</div><h1 id="pageTitle">我的資產總覽</h1>
+  <p class="subheading" id="pageSubtitle">台股官方收盤價、加密貨幣市場價格、年度目標與配置健檢</p></div>
   <div class="head-buttons"><button id="refreshQuotes" class="button secondary" type="button">↻ 更新股價</button><button id="newHolding" class="button primary" type="button">＋ 新增資產</button></div>
 </header>
 <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+<div class="page-view" data-page="overview" id="overviewPanel">
 <section class="stats" aria-label="投資總覽">
  <article class="stat"><div class="stat-label">已估值資產總額（TWD）</div><div class="stat-number" id="totalValue">NT$ 0</div><p class="stat-note" id="totalNote">待載入</p></article>
  <article class="stat"><div class="stat-label">未實現損益（可估值資產）</div><div class="stat-number" id="totalPnl">—</div><p class="stat-note" id="pnlNote">不含費用及稅務</p></article>
@@ -49,7 +63,8 @@
   <div class="card-heading"><div><h2>資產分類概覽</h2><p>按資產類別呈現資產金額與配置比例；無報價或缺匯率的不列入估值。</p></div></div>
   <div id="categoryCards" class="category-cards"></div>
 </section>
-<section class="content-card" id="holdings" aria-label="持倉明細">
+</div><!-- end overview -->
+<section class="content-card page-view" data-page="holdings" id="holdings" aria-label="持倉明細" hidden>
  <div class="card-heading"><div><h2>持倉管理</h2><p>台股與常見加密貨幣可自動查價；其他資產仍可手動估值。</p></div>
  <div class="quote-info"><span id="quoteDot" class="status-dot"></span><span id="quoteStatus">讀取行情中…</span></div></div>
  <div class="crypto-status-panel"><div><strong>加密貨幣行情（USD）</strong><p id="cryptoStatus" aria-live="polite">正在確認幣價…</p><small>24 小時市場參考價；非交易所即時成交價。來源：<a href="https://www.coingecko.com/" target="_blank" rel="noopener noreferrer">CoinGecko</a>。短期快取，API 限流或離線可能無法更新。</small></div><button id="refreshCrypto" class="button secondary" type="button">↻ 更新幣價</button></div>
@@ -58,7 +73,7 @@
  <tbody id="holdingsBody"><tr><td colspan="7" class="empty-cell">載入中…</td></tr></tbody></table></div>
  <div class="table-footer"><span id="lastSaved">本機儲存</span><span id="missingNote">台股：臺灣證券交易所／櫃買中心盤後資料</span></div>
 </section>
-<section class="content-card goal-section" id="goals">
+<section class="content-card goal-section page-view" data-page="goals" id="goals" hidden>
   <div class="card-heading"><div><h2>年度目標設定與檢視</h2><p>設定總資產目標及各分類理想占比，檢查是否偏離計畫。這不是投資建議。</p></div></div>
   <form id="goalForm" class="goal-form">
     <div class="goal-inputs">
@@ -79,7 +94,7 @@
   </form>
   <div class="goal-results"><h3>目標配置比較</h3><div id="goalComparison" class="goal-comparison muted">儲存目標比例後，這裡會顯示各類別的實際值與差距。</div></div>
 </section>
-<section class="content-card advice-section" id="advice" aria-labelledby="adviceHeading">
+<section class="content-card advice-section page-view" data-page="advice" id="advice" hidden aria-labelledby="adviceHeading">
  <div class="card-heading">
    <div><div class="eyebrow">REBALANCING / 配置健檢</div><h2 id="adviceHeading">下一筆資金怎麼分配？</h2>
      <p>依你設定的分類比例，試算新投入資金可優先補足的配置；這是試算，不是個別證券買入建議。</p></div>
@@ -96,9 +111,9 @@
    <div id="adviceCautions" class="advice-cautions"></div>
  </div>
 </section>
-<section class="bottom-row">
+<section class="bottom-row page-view" data-page="overview" hidden>
   <article class="mini-panel"><span class="mini-icon">ℹ</span><div><b>計算規則</b><p>台股／台灣 ETF 採官方最近交易日收盤價；美股、基金、支援的加密貨幣由 CoinGecko 自動報價；未支援幣種和其他資產價格需自行輸入；匯率由外部來源自動帶入，失敗時可輸入備援值。無有效估值的標的不會算作 0。期貨名目價值僅顯示曝險，不列入總資產或圓餅圖。</p></div></article>
-  <article class="mini-panel"><span class="mini-icon">⇅</span><div><b>私人資料備份</b><p>持倉、年度目標及匯率快取保存在當前瀏覽器；不同裝置需要手動匯入備份。</p><div class="backup-actions"><button type="button" class="inline-button" id="exportData">匯出 JSON</button><button type="button" class="inline-button" id="importButton">匯入 JSON</button></div></div></article>
+  <article class="mini-panel"><span class="mini-icon">⇅</span><div><b>私人資料備份</b><p>訪客資料只在本機；啟用 Google 登入與 Firestore 後，個人持倉與目標可雲端同步。建議定期匯出備份。</p><div class="backup-actions"><button type="button" class="inline-button" id="exportData">匯出 JSON</button><button type="button" class="inline-button" id="importButton">匯入 JSON</button></div></div></article>
 </section>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 <footer>持倉日誌 · 多資產記帳、年度目標及配置試算 · 非個別投資標的推薦，不含交易費、股利與稅務。</footer>
@@ -126,4 +141,30 @@
  <div class="dialog-actions"><button type="button" class="button secondary" id="cancelDialog">取消</button><button type="submit" class="button primary" id="submitHolding">儲存資產</button></div>
  </form>
 </dialog>
+<!-- First-visit login screen; Google login is real only after Firebase has been configured. -->
+<section class="auth-gate" id="authGate" hidden aria-label="登入介面" role="dialog" aria-modal="true">
+  <div class="auth-hero">
+    <div class="auth-brand"><span class="logo-mark">◈</span> 持倉日誌 <small>PORTFOLIO LEDGER</small></div>
+    <div class="auth-hero-body"><div class="eyebrow">YOUR PORTFOLIO, YOUR SPACE</div>
+      <h2>每一筆投資，<br>都有清晰的方向。</h2>
+      <p>一個介面管理持倉、資產配置、年度目標與下一筆投入試算。</p>
+      <div class="auth-features"><span>◉ 多資產分類</span><span>◉ 官方台股收盤行情</span><span>◉ 常見加密貨幣價格</span><span>◉ 個人投資目標</span></div>
+    </div>
+    <small class="auth-hero-foot">資料的掌控權留在你手中。</small>
+  </div>
+  <div class="auth-form-side">
+    <button id="closeAuth" class="auth-close" type="button" aria-label="關閉登入視窗">✕</button>
+    <div class="auth-panel"><span class="auth-kicker">WELCOME BACK</span><h2 id="authHeading">登入持倉日誌</h2>
+      <p class="auth-lead" id="authLead">Google 帳號登入後，可以使用私人雲端儲存。尚未設定登入時，也可以直接以訪客身分使用。</p>
+      <div id="authUserCard" class="auth-user-card" hidden></div>
+      <div class="auth-error" id="authError" role="status" aria-live="polite" hidden></div>
+      <button id="googleLogin" class="auth-google-button" type="button"><span class="google-g" aria-hidden="true">G</span> 使用 Google 帳號登入</button>
+      <button id="guestContinue" class="auth-guest-button" type="button">以訪客身分繼續使用</button>
+      <div class="auth-transfer" id="authTransfer" hidden><b>首次登入：選擇資料來源</b><p>偵測到本機訪客持倉。要將原本資料複製到此帳號的私人雲端嗎？</p><button type="button" id="migrateGuest" class="button primary">將訪客資料複製到雲端</button><button type="button" id="startCloudFresh" class="button secondary">建立空白雲端資料</button></div>
+      <button id="signOut" class="auth-guest-button" type="button" hidden>登出 Google 帳號</button>
+      <p class="auth-setup-note" id="authSetupNote">Google 登入需要先在 Firebase 啟用 Authentication、Firestore 和網域授權。未設定前訪客模式可正常使用。</p>
+      <div class="auth-privacy">本站不會替你下單。訪客資料存於瀏覽器；登入資料依你的 Firebase 安全規則分隔儲存。</div>
+    </div>
+  </div>
+</section>
 </body></html>

@@ -83,6 +83,15 @@ function readSaved(){
   catch{state.goals=defaultGoals();msg('目標設定讀取失敗，請重新設定或匯入備份。','error');}
 }
 function persist(){
+  if(window.PortfolioAccount?.isSignedIn()){
+    // In authenticated mode do not overwrite the visitor's browser data.
+    if(!window.PortfolioAccount.canWrite()){
+      msg('登入帳號的雲端資料尚未載入，請稍後再修改。','error');return false;
+    }
+    window.PortfolioAccount.saveProfile(window.PortfolioApp.snapshot());
+    $('lastSaved').textContent='已送出雲端儲存 · '+localTime();
+    return true;
+  }
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state.holdings));localStorage.setItem(GOAL_KEY,JSON.stringify(state.goals));$('lastSaved').textContent='本機已儲存 · '+localTime();return true;}
   catch{msg('資料儲存失敗，請先匯出 JSON 備份，確認瀏覽器是否允許本機儲存。','error');return false;}
 }
@@ -499,10 +508,34 @@ function init(){
  $('market').addEventListener('change',updateFormFields);$('symbol').addEventListener('input',autoMarket);
  $('manualPrice').addEventListener('input',previewPrice);$('currency').addEventListener('change',previewPrice);
  $('goalForm').addEventListener('submit',saveGoals);$('refreshFx').addEventListener('click',()=>refreshFx(true));$('exportData').addEventListener('click',exportBackup);
- $('calculateAdvice').addEventListener('click',()=>{try{localStorage.setItem(ADVICE_BUDGET_KEY,$('adviceBudget').value);}catch{}renderAdvice(aggregate());});
- $('adviceBudget').addEventListener('change',()=>{try{localStorage.setItem(ADVICE_BUDGET_KEY,$('adviceBudget').value);}catch{}renderAdvice(aggregate());});
+ $('calculateAdvice').addEventListener('click',()=>{if(window.PortfolioAccount?.isSignedIn())window.PortfolioAccount.saveProfile(window.PortfolioApp.snapshot());else try{localStorage.setItem(ADVICE_BUDGET_KEY,$('adviceBudget').value);}catch{}renderAdvice(aggregate());});
+ $('adviceBudget').addEventListener('change',()=>{if(window.PortfolioAccount?.isSignedIn())window.PortfolioAccount.saveProfile(window.PortfolioApp.snapshot());else try{localStorage.setItem(ADVICE_BUDGET_KEY,$('adviceBudget').value);}catch{}renderAdvice(aggregate());});
  $('importButton').addEventListener('click',()=>$('importFile').click());$('importFile').addEventListener('change',importBackup);
  refreshQuotes();refreshFx();refreshCryptoPrices();
  setInterval(()=>refreshCryptoPrices(),CRYPTO_CACHE_TTL);
 }
 init();
+
+/* Cloud account integration: guest keys remain untouched while logged in. */
+window.PortfolioApp = {
+  snapshot: () => ({ holdings: JSON.parse(JSON.stringify(state.holdings)), goals: JSON.parse(JSON.stringify(state.goals)), adviceBudget: $('adviceBudget')?.value || '' }),
+  visitorSnapshot: () => {
+    let holdings=[], goals=null, adviceBudget='';
+    try{holdings=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');if(!Array.isArray(holdings))holdings=[];}catch{}
+    try{goals=JSON.parse(localStorage.getItem(GOAL_KEY)||'null');}catch{}
+    try{adviceBudget=localStorage.getItem(ADVICE_BUDGET_KEY)||'';}catch{}
+    return {holdings,goals,adviceBudget};
+  },
+  loadProfile: (data) => {
+    const doc=data&&typeof data==='object'?data:{};
+    state.holdings=Array.isArray(doc.holdings)?doc.holdings.map(normalizeHolding).filter(Boolean):[];
+    state.goals=normalizeGoals(doc.goals);
+    if($('adviceBudget'))$('adviceBudget').value=(Number(doc.adviceBudget)>0?Number(doc.adviceBudget):10000);
+    fillGoalForm();render();
+  },
+  restoreVisitor: () => {
+    readSaved();
+    try{const budget=localStorage.getItem(ADVICE_BUDGET_KEY);if(budget&&Number(budget)>0)$('adviceBudget').value=budget;}catch{}
+    fillGoalForm();render();
+  }
+};
