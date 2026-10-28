@@ -2,6 +2,10 @@
 /* v2 keeps the original holdings storage key to preserve all previously entered TWSE/TPEX positions. */
 const STORAGE_KEY = 'portfolio-ledger-holdings-v1';
 const GOAL_KEY = 'portfolio-ledger-goals-v2';
+const FX_CACHE_KEY = 'portfolio-ledger-fx-auto-v1';
+const FX_FIAT_MAX_AGE = 24 * 60 * 60 * 1000;
+const FX_USDT_MAX_AGE = 15 * 60 * 1000;
+const FX_STALE_LIMIT = 14 * 24 * 60 * 60 * 1000;
 const CATEGORIES = [
   {id:'tw',name:'台股 / 台灣 ETF',short:'台股',color:'#238e81'},
   {id:'us',name:'美股',short:'美股',color:'#527fd4'},
@@ -13,7 +17,7 @@ const CATEGORIES = [
   {id:'futures',name:'期貨（名目曝險另列）',short:'期貨',color:'#dd7559'}
 ];
 const $ = id => document.getElementById(id);
-const state = {holdings:[],goals:defaultGoals(),quotes:{},markets:{},generatedAt:null,priceLoading:false,priceError:'',editing:null};
+const state = {holdings:[],goals:defaultGoals(),quotes:{},markets:{},generatedAt:null,priceLoading:false,priceError:'',editing:null,fxAuto:{fiat:null,usdt:null},fxLoading:false,fxErrors:[]};
 function defaultGoals(){return {year:Number(new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Taipei'}).slice(0,4)),amount:null,contributionGoal:null,contributionActual:null,fx:{USD:null,EUR:null,JPY:null,USDT:null},targets:{}};}
 const number=(v,d=2)=>Number(v).toLocaleString('zh-TW',{maximumFractionDigits:d});
 const money=(v,d=0)=>'NT$ '+number(v,d);
@@ -62,7 +66,81 @@ function persist(){
   catch{msg('資料儲存失敗，請先匯出 JSON 備份，確認瀏覽器是否允許本機儲存。','error');return false;}
 }
 function quoteFor(h){const q=state.quotes[h.market+':'+h.symbol];return q&&Number.isFinite(Number(q.price))&&Number(q.price)>0?q:null;}
-function fxRate(ccy){if(ccy==='TWD')return 1;const v=state.goals.fx[ccy];return v&&v>0?v:null;}
+// 當前使用來源：自動參考匯率優先；老版本手填值只在無自動資料時備援。
+function autoFxRate(ccy){
+ if(ccy==='TWD')return 1;
+ const fiat=state.fxAuto.fiat;
+ if(!fiat||!fiat.fetchedAt||Date.now()-fiat.fetchedAt>FX_STALE_LIMIT)return null;
+ if(ccy==='USDT'){
+  const usdt=state.fxAuto.usdt;
+  return usdt&&usdt.usd>0&&usdt.fetchedAt&&Date.now()-usdt.fetchedAt<=FX_STALE_LIMIT?fiat.rates.USD*usdt.usd:null;
+ }
+ return fiat.rates[ccy]||null;
+}
+function fxRate(ccy){if(ccy==='TWD')return 1;const automatic=autoFxRate(ccy);if(automatic)return automatic;const manual=state.goals.fx[ccy];return manual&&manual>0?manual:null;}
+function loadFxCache(){
+ try{
+  const raw=JSON.parse(localStorage.getItem(FX_CACHE_KEY)||'{}');
+  if(raw.fiat&&['USD','EUR','JPY'].every(c=>Number.isFinite(Number(raw.fiat.rates?.[c]))&&Number(raw.fiat.rates[c])>0)&&Number.isFinite(raw.fiat.fetchedAt))state.fxAuto.fiat=raw.fiat;
+  if(raw.usdt&&Number(raw.usdt.usd)>0&&Number.isFinite(raw.usdt.fetchedAt))state.fxAuto.usdt=raw.usdt;
+ }catch{/* 快取損毀不應阻止持倉顯示 */}
+}
+function cacheFx(){try{localStorage.setItem(FX_CACHE_KEY,JSON.stringify(state.fxAuto));}catch{/* 快取儲存失敗時本次頁面仍可使用 */}}
+function fxTime(t){return t?new Date(t).toLocaleString('zh-TW',{timeZone:'Asia/Taipei',hour12:false}):'日期未知';}
+function fxDisplayValue(v){return v===null?'':String(Number(v.toPrecision(8)));}
+function renderFxFields(){
+ const missing=[],fromManual=[];
+ for(const c of ['USD','EUR','JPY','USDT']){
+  const input=$('fx'+c),auto=autoFxRate(c),manual=state.goals.fx[c];
+  input.readOnly=auto!==null;
+  input.value=auto!==null?fxDisplayValue(auto):(manual??'');
+  input.title=auto!==null?'已自動讀取，隨市場參考匯率更新':(manual?'自動服務暫無資料，沿用舊手動匯率':'自動來源無法取得，可以手動填入備援匯率');
+  input.placeholder=auto!==null?'已取得自動匯率':'尚無匯率，可手動備援';
+  if(auto===null){if(manual)fromManual.push(c);else missing.push(c);}
+ }
+ const fiat=state.fxAuto.fiat,usdt=state.fxAuto.usdt;
+ const fiatAge=fiat?Date.now()-fiat.fetchedAt:Infinity;
+ const usdtAge=usdt?Date.now()-usdt.fetchedAt:Infinity;
+ const parts=[];
+ if(state.fxLoading)parts.push('正在查詢匯率…');
+ if(fiat)parts.push('法幣資料 '+fxTime(fiat.sourceUpdatedAt)+'（'+(fiatAge>FX_FIAT_MAX_AGE?'快取／可能過期':'已取得')+'）');
+ if(usdt)parts.push('USDT 資料 '+fxTime(usdt.sourceUpdatedAt)+'（'+(usdtAge>FX_USDT_MAX_AGE?'快取／可能過期':'已取得')+'）');
+ if(fromManual.length)parts.push(fromManual.join('、')+'：舊手動值備援');
+ if(missing.length)parts.push(missing.join('、')+'：尚無有效匯率');
+ if(state.fxErrors.length)parts.push('查詢問題：'+state.fxErrors.join('；'));
+ $('fxStatus').textContent=parts.join('｜')||'準備取得自動參考匯率…';
+ $('refreshFx').disabled=state.fxLoading;
+}
+async function fetchJsonWithTimeout(url){
+ const controller=new AbortController(),timer=setTimeout(()=>controller.abort(),12000);
+ try{const response=await fetch(url,{signal:controller.signal,cache:'no-store'});if(!response.ok)throw Error('HTTP '+response.status);return await response.json();}
+ finally{clearTimeout(timer);}
+}
+async function refreshFx(force=false){
+ if(state.fxLoading)return;
+ const now=Date.now();
+ const fiatDue=!state.fxAuto.fiat||now-state.fxAuto.fiat.fetchedAt>(force?60*60*1000:FX_FIAT_MAX_AGE);
+ const usdtDue=!state.fxAuto.usdt||now-state.fxAuto.usdt.fetchedAt>(force?60*1000:FX_USDT_MAX_AGE);
+ if(!fiatDue&&!usdtDue){renderFxFields();render();return;}
+ state.fxLoading=true;state.fxErrors=[];renderFxFields();
+ const tasks=[];
+ if(fiatDue)tasks.push((async()=>{
+  const data=await fetchJsonWithTimeout('https://open.er-api.com/v6/latest/USD');
+  const r=data.rates||{};
+  if(data.result!=='success'||data.base_code!=='USD'||!['USD','EUR','JPY','TWD'].every(c=>Number.isFinite(Number(r[c]))&&Number(r[c])>0))throw Error('法幣資料格式異常');
+  const next={USD:Number(r.TWD),EUR:Number(r.TWD)/Number(r.EUR),JPY:Number(r.TWD)/Number(r.JPY)};
+  state.fxAuto.fiat={rates:next,fetchedAt:Date.now(),sourceUpdatedAt:Number(data.time_last_update_unix)*1000||Date.now()};
+ })().catch(e=>state.fxErrors.push('法幣 '+(e.name==='AbortError'?'逾時':e.message))));
+ if(usdtDue)tasks.push((async()=>{
+  const data=await fetchJsonWithTimeout('https://api.coingecko.com/api/v3/simple/price?ids=tether&vs_currencies=usd&include_last_updated_at=true');
+  const price=Number(data.tether?.usd);
+  if(!Number.isFinite(price)||price<=0)throw Error('USDT 報價格式異常');
+  state.fxAuto.usdt={usd:price,fetchedAt:Date.now(),sourceUpdatedAt:Number(data.tether?.last_updated_at)*1000||Date.now()};
+ })().catch(e=>state.fxErrors.push('USDT '+(e.name==='AbortError'?'逾時':e.message))));
+ await Promise.all(tasks);
+ state.fxLoading=false;cacheFx();renderFxFields();render();
+}
+
 function evaluate(h){
   const q=h.market!=='MANUAL'?quoteFor(h):null;
   const price=h.category==='cash'?1:(h.market==='MANUAL'?h.manualPrice:(q?Number(q.price):null));
@@ -226,7 +304,7 @@ function tableAction(e){
 }
 function fillGoalForm(){
  const g=state.goals;for(const [field,key] of [['goalYear','year'],['goalAmount','amount'],['contributionGoal','contributionGoal'],['contributionActual','contributionActual']])$(field).value=g[key]??'';
- for(const c of ['USD','EUR','JPY','USDT'])$('fx'+c).value=g.fx[c]??'';
+ renderFxFields();
  for(const c of CATEGORIES.filter(x=>x.id!=='futures'))$('target_'+c.id).value=g.targets[c.id]??'';
 }
 function saveGoals(e){
@@ -239,7 +317,7 @@ function saveGoals(e){
  if(Object.values(raw.fx).some(v=>v!==''&&(!(Number(v)>0)||!Number.isFinite(Number(v))))){$('goalError').textContent='填寫的匯率必須大於 0。';return;}
  if(!Number.isInteger(Number(raw.year))||Number(raw.year)<2020||Number(raw.year)>2100){$('goalError').textContent='目標年度需為 2020～2100。';return;}
  if(['amount','contributionGoal','contributionActual'].some(k=>raw[k]!==''&&(!(Number(raw[k])>=0)||!Number.isFinite(Number(raw[k]))))){$('goalError').textContent='目標金額與投入金額不能為負數。';return;}
- state.goals=normalizeGoals(raw);persist();render();msg('已儲存年度目標、分類配置及自訂匯率。');
+ state.goals=normalizeGoals(raw);persist();render();renderFxFields();msg('已儲存年度目標與資產配置；匯率將依資料來源自動更新。');
 }
 function exportBackup(){
  const payload={format:'portfolio-ledger-v2',exportedAt:new Date().toISOString(),holdings:state.holdings,goals:state.goals};
@@ -259,7 +337,7 @@ async function importBackup(e){
 function init(){
  for(const c of CATEGORIES){$('category').insertAdjacentHTML('beforeend',`<option value="${c.id}">${escapeHTML(c.name)}</option>`);$('categoryFilter').insertAdjacentHTML('beforeend',`<option value="${c.id}">${escapeHTML(c.name)}</option>`);}
  $('targetPercentInputs').innerHTML=CATEGORIES.filter(c=>c.id!=='futures').map(c=>`<label class="field"><span><i class="input-dot" style="background:${c.color}"></i>${escapeHTML(c.name)}（%）</span><input id="target_${c.id}" type="number" min="0" max="100" step="0.1" placeholder="選填"></label>`).join('');
- readSaved();fillGoalForm();render();
+ readSaved();loadFxCache();fillGoalForm();render();
  $('newHolding').addEventListener('click',()=>openDialog());$('refreshQuotes').addEventListener('click',refreshQuotes);
  $('categoryFilter').addEventListener('change',render);$('holdingsBody').addEventListener('click',tableAction);
  $('closeDialog').addEventListener('click',()=>$('holdingDialog').close());$('cancelDialog').addEventListener('click',()=>$('holdingDialog').close());
@@ -267,8 +345,8 @@ function init(){
  $('category').addEventListener('change',()=>{if($('category').value==='tw')$('market').value='TWSE';else $('market').value='MANUAL';updateFormFields();});
  $('market').addEventListener('change',updateFormFields);$('symbol').addEventListener('input',autoMarket);
  $('manualPrice').addEventListener('input',previewPrice);$('currency').addEventListener('change',previewPrice);
- $('goalForm').addEventListener('submit',saveGoals);$('exportData').addEventListener('click',exportBackup);
+ $('goalForm').addEventListener('submit',saveGoals);$('refreshFx').addEventListener('click',()=>refreshFx(true));$('exportData').addEventListener('click',exportBackup);
  $('importButton').addEventListener('click',()=>$('importFile').click());$('importFile').addEventListener('change',importBackup);
- refreshQuotes();
+ refreshQuotes();refreshFx();
 }
 init();

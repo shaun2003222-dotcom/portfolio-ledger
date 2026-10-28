@@ -64,11 +64,12 @@
       <label class="field"><span>年底資產目標（新台幣）</span><input id="goalAmount" type="number" min="0" step="any" placeholder="例如 1000000"></label>
       <label class="field"><span>本年度預計投入（新台幣）</span><input id="contributionGoal" type="number" min="0" step="any" placeholder="例如 120000"></label>
       <label class="field"><span>今年已投入（新台幣）</span><input id="contributionActual" type="number" min="0" step="any" placeholder="自行更新投入額"></label>
-      <label class="field"><span>美元匯率 USD → TWD（手填）</span><input id="fxUSD" type="number" min="0" step="any" placeholder="例如 32.5"></label>
-      <label class="field"><span>歐元匯率 EUR → TWD（手填）</span><input id="fxEUR" type="number" min="0" step="any" placeholder="需要時填入"></label>
-      <label class="field"><span>日圓匯率 JPY → TWD（手填）</span><input id="fxJPY" type="number" min="0" step="any" placeholder="需要時填入"></label>
-      <label class="field"><span>USDT → TWD（手填）</span><input id="fxUSDT" type="number" min="0" step="any" placeholder="請勿假設與 USD 固定 1:1"></label>
+      <label class="field"><span>美元匯率 USD → TWD（自動）</span><input id="fxUSD" type="number" min="0" step="any" placeholder="自動取得中"></label>
+      <label class="field"><span>歐元匯率 EUR → TWD（自動）</span><input id="fxEUR" type="number" min="0" step="any" placeholder="自動取得中"></label>
+      <label class="field"><span>日圓匯率 JPY → TWD（自動）</span><input id="fxJPY" type="number" min="0" step="any" placeholder="自動取得中"></label>
+      <label class="field"><span>USDT → TWD（自動）</span><input id="fxUSDT" type="number" min="0" step="any" placeholder="自動取得中"></label>
     </div>
+    <div class="fx-status-bar"><div><strong>參考匯率自動更新</strong><p id="fxStatus" aria-live="polite">正在讀取匯率…</p><small>資料來源：<a href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer">Rates By Exchange Rate API</a>、<a href="https://www.coingecko.com/en/coins/tether" target="_blank" rel="noopener noreferrer">CoinGecko</a>。每次開啟網站自動檢查；法幣約每日更新，USDT 約每 15 分鐘檢查。非銀行成交匯率。</small></div><button type="button" class="button secondary" id="refreshFx">↻ 更新匯率</button></div>
     <h3 class="goal-subhead">目標資產配置比例 <small>選填；有填時百分比合計須為 100%</small></h3>
     <div id="targetPercentInputs" class="percent-grid"></div>
     <p class="form-error" id="goalError" role="alert"></p>
@@ -77,8 +78,8 @@
   <div class="goal-results"><h3>目標配置比較</h3><div id="goalComparison" class="goal-comparison muted">儲存目標比例後，這裡會顯示各類別的實際值與差距。</div></div>
 </section>
 <section class="bottom-row">
-  <article class="mini-panel"><span class="mini-icon">ℹ</span><div><b>計算規則</b><p>台股／台灣 ETF 採官方最近交易日收盤價；美股、基金、加密貨幣及其他資產價格與換匯率均需自行輸入。無有效估值的標的不會算作 0。期貨名目價值僅顯示曝險，不列入總資產或圓餅圖。</p></div></article>
-  <article class="mini-panel"><span class="mini-icon">⇅</span><div><b>私人資料備份</b><p>所有持倉、年度目標與匯率保存在當前瀏覽器；不同裝置需要手動匯入備份。</p><div class="backup-actions"><button type="button" class="inline-button" id="exportData">匯出 JSON</button><button type="button" class="inline-button" id="importButton">匯入 JSON</button></div></div></article>
+  <article class="mini-panel"><span class="mini-icon">ℹ</span><div><b>計算規則</b><p>台股／台灣 ETF 採官方最近交易日收盤價；美股、基金、加密貨幣及其他資產價格需自行輸入；匯率由外部來源自動帶入，失敗時可輸入備援值。無有效估值的標的不會算作 0。期貨名目價值僅顯示曝險，不列入總資產或圓餅圖。</p></div></article>
+  <article class="mini-panel"><span class="mini-icon">⇅</span><div><b>私人資料備份</b><p>持倉、年度目標及匯率快取保存在當前瀏覽器；不同裝置需要手動匯入備份。</p><div class="backup-actions"><button type="button" class="inline-button" id="exportData">匯出 JSON</button><button type="button" class="inline-button" id="importButton">匯入 JSON</button></div></div></article>
 </section>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 <footer>持倉日誌 · 多資產記帳與年度目標 · 不包含交易費、股利、稅務或完整投資報酬率。</footer>

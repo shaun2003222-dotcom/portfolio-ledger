@@ -11,3 +11,13 @@
 @media(max-width:1000px){.side-menu{display:flex;flex-direction:row;gap:8px}.side-menu a{font-size:12px}.side-menu .nav-selected{display:flex}.side-menu .nav-symbol{display:none}.aside-foot{display:none}.sidebar{gap:18px}.main{padding-top:26px}}
 @media(max-width:690px){.sidebar{align-items:flex-start;flex-direction:column}.side-menu a{padding:7px 10px;font-size:11px}.topbar h1{font-size:27px}.stats{grid-template-columns:1fr 1fr;gap:9px}.stat{padding:15px}.stat-number{font-size:23px;white-space:normal}.stat-label{font-size:11px}.allocation-wrap{grid-template-columns:1fr;justify-items:center;padding:0 18px 25px;gap:22px}.allocation-legend{width:100%}.legend-line{grid-template-columns:9px 1fr 52px auto}.category-cards{grid-template-columns:1fr 1fr;padding:0 14px 16px;gap:8px}.category-tile{padding:12px 10px}.category-tile strong{font-size:17px}.category-tile small{line-height:1.4}.filters{padding:0 17px 16px}.goal-form{padding:0 18px}.goal-inputs,.percent-grid{grid-template-columns:1fr 1fr;gap:10px}.goal-results{margin:25px 18px 0}.comparison-line{grid-template-columns:110px 1fr 82px;gap:8px}.comparison-line b{font-size:11px}.target-number{font-size:26px}.target-overview{padding:0 18px 22px}.table-wrap{overflow:auto}}
 @media(max-width:390px){.stats,.category-cards{grid-template-columns:1fr}.goal-inputs,.percent-grid{grid-template-columns:1fr}}
+
+/* FX auto rate panel */
+.fx-status-bar{margin:16px 0 6px;padding:15px 17px;background:#f1f8f7;border:1px solid #daece8;border-radius:12px;display:flex;gap:15px;align-items:center;justify-content:space-between}
+.fx-status-bar strong{display:block;font-size:13px;color:#1e675d}
+.fx-status-bar p{font-size:12px;color:#507b75;margin:5px 0;line-height:1.7;word-break:break-word}
+.fx-status-bar small{font-size:11px;color:#71878a;line-height:1.5;display:block}
+.fx-status-bar a{color:#206d67;text-decoration:underline}
+.fx-status-bar .button{white-space:nowrap;flex-shrink:0}
+.field input[readonly]{background:#f2f8f5;color:#155f51;font-weight:750;cursor:default}
+@media(max-width:640px){.fx-status-bar{display:block}.fx-status-bar .button{margin-top:12px;width:100%}}
