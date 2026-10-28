@@ -16,6 +16,7 @@
     <a class="nav-selected" href="#overview"><span class="nav-symbol">▦</span> 資產總覽</a>
     <a class="side-link" href="#holdings"><span class="nav-symbol">≡</span> 持倉管理</a>
     <a class="side-link" href="#goals"><span class="nav-symbol">◎</span> 年度目標</a>
+    <a class="side-link" href="#advice"><span class="nav-symbol">✦</span> 下一筆投入</a>
   </nav>
   <div class="aside-foot"><div class="connection"><span class="live-dot"></span> 私人瀏覽器儲存</div>
     <p>持倉及目標僅存在目前瀏覽器，不會上傳到 GitHub。換裝置請先匯出 JSON 備份。</p></div>
@@ -77,12 +78,29 @@
   </form>
   <div class="goal-results"><h3>目標配置比較</h3><div id="goalComparison" class="goal-comparison muted">儲存目標比例後，這裡會顯示各類別的實際值與差距。</div></div>
 </section>
+<section class="content-card advice-section" id="advice" aria-labelledby="adviceHeading">
+ <div class="card-heading">
+   <div><div class="eyebrow">REBALANCING / 配置健檢</div><h2 id="adviceHeading">下一筆資金怎麼分配？</h2>
+     <p>依你設定的分類比例，試算新投入資金可優先補足的配置；這是試算，不是個別證券買入建議。</p></div>
+   <a class="text-link" href="#goals">調整目標比例 →</a>
+ </div>
+ <div class="advice-control-bar">
+   <label class="field"><span>本次預計新增的投資資金（新台幣）</span><input id="adviceBudget" type="number" min="1" step="1" inputmode="decimal" placeholder="例如 10000" value="10000" aria-describedby="adviceBudgetHelp"></label>
+   <button id="calculateAdvice" class="button primary" type="button">分析配置並試算</button>
+   <small id="adviceBudgetHelp">假設是新投入的外部資金，不是從既有現金部位挪用；不含手續費及未來報酬。</small>
+ </div>
+ <div class="advice-result" aria-live="polite">
+   <div id="adviceSummary" class="advice-summary">設定年度分類目標並輸入投入金額，就會顯示計算結果。</div>
+   <div id="adviceCards" class="advice-cards"></div>
+   <div id="adviceCautions" class="advice-cautions"></div>
+ </div>
+</section>
 <section class="bottom-row">
   <article class="mini-panel"><span class="mini-icon">ℹ</span><div><b>計算規則</b><p>台股／台灣 ETF 採官方最近交易日收盤價；美股、基金、加密貨幣及其他資產價格需自行輸入；匯率由外部來源自動帶入，失敗時可輸入備援值。無有效估值的標的不會算作 0。期貨名目價值僅顯示曝險，不列入總資產或圓餅圖。</p></div></article>
   <article class="mini-panel"><span class="mini-icon">⇅</span><div><b>私人資料備份</b><p>持倉、年度目標及匯率快取保存在當前瀏覽器；不同裝置需要手動匯入備份。</p><div class="backup-actions"><button type="button" class="inline-button" id="exportData">匯出 JSON</button><button type="button" class="inline-button" id="importButton">匯入 JSON</button></div></div></article>
 </section>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
-<footer>持倉日誌 · 多資產記帳與年度目標 · 不包含交易費、股利、稅務或完整投資報酬率。</footer>
+<footer>持倉日誌 · 多資產記帳、年度目標及配置試算 · 非個別投資標的推薦，不含交易費、股利與稅務。</footer>
 </main></div>
 <dialog id="holdingDialog" aria-labelledby="dialogTitle">
  <form id="holdingForm" novalidate>

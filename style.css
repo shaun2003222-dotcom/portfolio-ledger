@@ -21,3 +21,30 @@
 .fx-status-bar .button{white-space:nowrap;flex-shrink:0}
 .field input[readonly]{background:#f2f8f5;color:#155f51;font-weight:750;cursor:default}
 @media(max-width:640px){.fx-status-bar{display:block}.fx-status-bar .button{margin-top:12px;width:100%}}
+
+/* Contribution / allocation planning */
+#advice{scroll-margin-top:18px}
+.advice-section{margin-top:20px;padding-bottom:27px}
+.advice-control-bar{display:flex;align-items:end;gap:14px;flex-wrap:wrap;padding:0 27px 20px}
+.advice-control-bar .field{min-width:min(340px,100%);flex:0 1 385px}
+.advice-control-bar .button{min-height:46px}
+.advice-control-bar>small{flex-basis:100%;color:#8494a2;font-size:11px;line-height:1.65}
+.advice-result{border-top:1px solid #e9eef2;padding:21px 27px 0}
+.advice-summary{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:13px;margin-bottom:15px}
+.advice-summary>div{background:#f3f8f7;border:1px solid #e1eee8;border-radius:13px;padding:15px}
+.advice-summary small{color:#708f8a;display:block;font-size:11px}
+.advice-summary strong{font-size:21px;display:block;margin-top:5px;letter-spacing:-.5px;color:#174e49}
+.advice-needs-setup{display:block;border-radius:12px;padding:17px;background:#fff9ee;border:1px solid #f2e3c9;color:#826445;font-size:13px}
+.advice-cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+.advice-tile{background:#fff;border:1px solid #e7edf1;border-radius:14px;padding:18px;min-width:0}
+.advice-tile-top{display:flex;align-items:center;gap:8px;font-size:12px;color:#526b7c}
+.advice-tile-top span:last-child{margin-left:auto;color:#8b9ba8;white-space:nowrap}
+.advice-tile-amount{margin-top:13px;color:#7a8d9c;font-size:12px}
+.advice-tile-amount strong{display:block;font-size:24px;color:#186f64;margin-top:4px}
+.advice-tile-detail,.advice-study,.advice-existing{font-size:11px;color:#74899a;line-height:1.7;margin:10px 0 0}
+.advice-tile-bar{height:7px;border-radius:10px;overflow:hidden;background:#edf1f5;margin-top:12px}
+.advice-tile-bar span{height:100%;display:block;border-radius:10px}
+.advice-study{color:#485e6e;font-weight:500}
+.advice-cautions{font-size:11px;line-height:1.65;color:#76899b;margin-top:16px}
+.advice-cautions p{margin:5px 0;padding-left:13px;border-left:2px solid #d8e8e5}
+@media(max-width:690px){.advice-control-bar,.advice-result{padding-left:18px;padding-right:18px}.advice-summary{grid-template-columns:1fr}.advice-cards{grid-template-columns:1fr}.advice-control-bar .field{flex-basis:100%}.advice-control-bar .button{width:100%}}

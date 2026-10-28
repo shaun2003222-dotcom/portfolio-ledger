@@ -3,6 +3,7 @@
 const STORAGE_KEY = 'portfolio-ledger-holdings-v1';
 const GOAL_KEY = 'portfolio-ledger-goals-v2';
 const FX_CACHE_KEY = 'portfolio-ledger-fx-auto-v1';
+const ADVICE_BUDGET_KEY = 'portfolio-ledger-advice-budget-v1';
 const FX_FIAT_MAX_AGE = 24 * 60 * 60 * 1000;
 const FX_USDT_MAX_AGE = 15 * 60 * 1000;
 const FX_STALE_LIMIT = 14 * 24 * 60 * 60 * 1000;
@@ -212,6 +213,66 @@ function renderGoals(agg){
    return `<div class="comparison-line"><div><b>${escapeHTML(c.name)}</b><small>目標 ${number(target)}%</small></div><div class="comparison-meter"><span style="background:${c.color};width:${Math.max(0,Math.min(100,curr||0))}%"></span></div><div class="comparison-result"><b>${curr===null?'—':number(curr,1)+'%'}</b><small class="${deltaClass}">${deltaText}</small></div></div>`;
  }).join('')+'<p class="muted compare-foot">差距只是與自行設定比例的比較，不代表必須立即買進或賣出。預設以 ±5 個百分點作提醒。</p>';
 }
+/**
+ * 新資金補足配置的試算器：僅針對已估值的非期貨資產。
+ * 投入上限為輸入的新資金金額，對低於「投入後總資產 × 目標比例」的類別依缺口分配。
+ * 不挑選／買進具體金融商品，不保證未來績效，也不會下單。
+ */
+function computeContributionPlan(agg, budget, targets) {
+ const eligible=CATEGORIES.filter(c=>c.id!=='futures');
+ const goalTotal=eligible.reduce((n,c)=>n+(Number(targets[c.id])||0),0);
+ if(Math.abs(goalTotal-100)>0.01)return {error:'請先到「年度目標」，將各類資產的目標比例設定為合計 100%，再儲存。'};
+ if(!Number.isFinite(budget)||budget<1||budget>1e12)return {error:'請輸入大於 0、且不超過 NT$1 兆的本次投入金額。'};
+ if(agg.missing.some(x=>x.h.category!=='futures'))return {error:'有持倉缺少有效股價或匯率。請先補齊，避免以不完整資產計算買進配置。'};
+ const postTotal=agg.total+budget;
+ const items=eligible.map(c=>({
+    category:c, current:agg.groups[c.id].value, target:Number(targets[c.id])||0,
+    shortfall:Math.max(0,(Number(targets[c.id])||0)/100*postTotal-agg.groups[c.id].value)
+ })).filter(x=>x.target>0&&x.shortfall>0.0001);
+ const shortfallTotal=items.reduce((sum,x)=>sum+x.shortfall,0);
+ if(!shortfallTotal)return {error:'目前沒有低於目標的分類；請確認設定的比例是否符合你的風險承受度。'};
+ // 最大餘數法：使分配至各類別的整數元加總等於預算。
+ const budgetWhole=Math.floor(budget);
+ const base=items.map(x=>({ ...x, exact:budgetWhole*x.shortfall/shortfallTotal }));
+ for(const x of base){x.suggested=Math.floor(x.exact);x.fraction=x.exact-x.suggested;}
+ let remainder=budgetWhole-base.reduce((sum,x)=>sum+x.suggested,0);
+ for(const x of [...base].sort((a,b)=>b.fraction-a.fraction).slice(0,remainder))x.suggested++;
+ return {budget:budgetWhole,postTotal,items:base.filter(x=>x.suggested>0).sort((a,b)=>b.suggested-a.suggested)};
+}
+const categoryStudyTip={
+ tw:'可研究分散型台股 ETF 的持股範圍、費用與追蹤指數；不要只看近期漲幅。',
+ us:'可研究低成本、多元化的美股 ETF／基金，並考量匯率與海外交易成本。',
+ fund:'先比較基金投資範圍、管理費、重複持股及申購／贖回限制。',
+ crypto:'加密資產波動及損失風險高；即使目標比例不足，也不代表適合直接加碼。',
+ bond:'可研究分散型債券基金／ETF，並評估存續期間、利率及信用風險。',
+ cash:'這筆可留作現金／緊急預備金，無須為了達成比例而買入商品。',
+ other:'先確認這一類資產的流動性、估值依據及是否適合增加。'
+};
+function renderAdvice(agg){
+ const summary=$('adviceSummary'),cards=$('adviceCards'),cautions=$('adviceCautions');
+ if(!summary)return;
+ const budget=finiteMaybe($('adviceBudget').value);
+ const plan=computeContributionPlan(agg,budget,state.goals.targets);
+ cards.innerHTML='';cautions.innerHTML='';
+ if(plan.error){summary.textContent=plan.error;summary.className='advice-summary advice-needs-setup';return;}
+ const remaining=state.goals.amount===null?null:Math.max(0,state.goals.amount-plan.postTotal);
+ summary.className='advice-summary';
+ summary.innerHTML=`<div><small>本次新增資金</small><strong>${money(plan.budget)}</strong></div><div><small>投入後估計資產（假設價格不變）</small><strong>${money(plan.postTotal)}</strong></div><div><small>距年底資產目標</small><strong>${remaining===null?'尚未設定':money(remaining)}</strong></div>`;
+ cards.innerHTML=plan.items.map(x=>{
+  const existing=agg.all.filter(z=>z.h.category===x.category.id&&z.valid).slice(0,3);
+  const examples=existing.length?`<p class="advice-existing">目前已持有：${existing.map(z=>escapeHTML(z.h.name||z.quote?.name||z.h.symbol)).join('、')}（僅供檢視，非推薦加碼）</p>`:'<p class="advice-existing">目前未持有這一類；先研究適合自身風險與費用需求的工具。</p>';
+  return `<article class="advice-tile"><div class="advice-tile-top"><span class="cat-dot" style="background:${x.category.color}"></span><b>${escapeHTML(x.category.name)}</b><span>目標 ${number(x.target,1)}%</span></div>
+    <div class="advice-tile-amount">${x.category.id==='cash'?'建議預留':'可評估投入'} <strong>${money(x.suggested)}</strong></div>
+    <p class="advice-tile-detail">目前 ${money(x.current)} · 相對投入後目標缺口 ${money(x.shortfall)} · 試算後占比 ${number((x.current+x.suggested)/plan.postTotal*100,1)}%</p>
+    <div class="advice-tile-bar"><span style="width:${Math.min(100,plan.budget?x.suggested/plan.budget*100:0)}%;background:${x.category.color}"></span></div>
+    <p class="advice-study">${escapeHTML(categoryStudyTip[x.category.id]||categoryStudyTip.other)}</p>${examples}</article>`;
+ }).join('');
+ const notes=['這是依你自訂目標比例的分配試算，不是個別股票、基金、期貨或虛擬資產的買入訊號；網站不會替你下單。'];
+ if(agg.all.some(x=>x.h.category==='futures'))notes.push('期貨名目曝險與保證金未納入資產圓餅圖；試算前應另外檢查槓桿與資金風險。');
+ if(plan.items.some(x=>x.category.id==='crypto'))notes.push('加密貨幣價格可能劇烈波動，不能因分類低於目標就視為適合加碼。');
+ if(state.goals.amount!==null)notes.push('距目標差距僅是現值與投入額的算術比較，不代表年度目標一定能達成。');
+ cautions.innerHTML=notes.map(t=>`<p>${escapeHTML(t)}</p>`).join('');
+}
 function render(){
  const agg=aggregate();const priced=agg.valued.length,assetCount=agg.all.filter(x=>x.h.category!=='futures').length;
  $('totalValue').textContent=priced?money(agg.total):assetCount?'尚無可估值資產':'NT$ 0';
@@ -229,7 +290,7 @@ function render(){
  const dot=$('quoteDot');dot.className='status-dot '+(state.priceLoading?'':state.priceError?'error':Object.keys(state.quotes).length?'ready':'');
  const statuses=Object.entries(state.markets).filter(([,v])=>v&&v.date).map(([k,v])=>(k==='TWSE'?'上市':'上櫃')+' '+v.date);
  $('quoteStatus').textContent=state.priceLoading?'正在取得官方行情…':state.priceError?'台股報價讀取失敗':statuses.length?'台股行情 · '+statuses.join(' / '):'尚未下載台股報價';
- renderPie(agg);renderCategories(agg);renderGoals(agg);previewPrice();
+ renderPie(agg);renderCategories(agg);renderGoals(agg);renderAdvice(agg);previewPrice();
 }
 function parseQuotes(data){
  if(!data||typeof data!=='object'||!data.quotes||typeof data.quotes!=='object')throw Error('行情檔格式不正確');
@@ -337,7 +398,10 @@ async function importBackup(e){
 function init(){
  for(const c of CATEGORIES){$('category').insertAdjacentHTML('beforeend',`<option value="${c.id}">${escapeHTML(c.name)}</option>`);$('categoryFilter').insertAdjacentHTML('beforeend',`<option value="${c.id}">${escapeHTML(c.name)}</option>`);}
  $('targetPercentInputs').innerHTML=CATEGORIES.filter(c=>c.id!=='futures').map(c=>`<label class="field"><span><i class="input-dot" style="background:${c.color}"></i>${escapeHTML(c.name)}（%）</span><input id="target_${c.id}" type="number" min="0" max="100" step="0.1" placeholder="選填"></label>`).join('');
- readSaved();loadFxCache();fillGoalForm();render();
+ readSaved();loadFxCache();fillGoalForm();
+ try{const saved=finiteMaybe(localStorage.getItem(ADVICE_BUDGET_KEY));if(saved!==null&&saved>=0&&saved<=1e12)$('adviceBudget').value=saved;}
+ catch{/* storage blocked */}
+ render();
  $('newHolding').addEventListener('click',()=>openDialog());$('refreshQuotes').addEventListener('click',refreshQuotes);
  $('categoryFilter').addEventListener('change',render);$('holdingsBody').addEventListener('click',tableAction);
  $('closeDialog').addEventListener('click',()=>$('holdingDialog').close());$('cancelDialog').addEventListener('click',()=>$('holdingDialog').close());
@@ -346,6 +410,8 @@ function init(){
  $('market').addEventListener('change',updateFormFields);$('symbol').addEventListener('input',autoMarket);
  $('manualPrice').addEventListener('input',previewPrice);$('currency').addEventListener('change',previewPrice);
  $('goalForm').addEventListener('submit',saveGoals);$('refreshFx').addEventListener('click',()=>refreshFx(true));$('exportData').addEventListener('click',exportBackup);
+ $('calculateAdvice').addEventListener('click',()=>{try{localStorage.setItem(ADVICE_BUDGET_KEY,$('adviceBudget').value);}catch{}renderAdvice(aggregate());});
+ $('adviceBudget').addEventListener('change',()=>{try{localStorage.setItem(ADVICE_BUDGET_KEY,$('adviceBudget').value);}catch{}renderAdvice(aggregate());});
  $('importButton').addEventListener('click',()=>$('importFile').click());$('importFile').addEventListener('change',importBackup);
  refreshQuotes();refreshFx();
 }
