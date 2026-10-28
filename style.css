@@ -101,3 +101,17 @@ body.account-loading .main{pointer-events:none;opacity:.65}
 @media(max-width:1000px){.sidebar-user{margin:0 0 0 auto;max-width:260px;min-width:190px}.sidebar{flex-wrap:wrap}.aside-foot{display:none}}
 @media(max-width:690px){.sidebar{align-items:stretch}.sidebar-user{margin:4px 0 0;max-width:none}.side-menu{overflow-x:auto;scrollbar-width:thin;white-space:nowrap}.side-menu a{flex:none}.auth-gate{grid-template-columns:1fr}.auth-hero{min-height:260px;padding:26px 24px}.auth-hero-body{margin:30px 0 5px}.auth-hero-body h2{font-size:29px;margin:10px 0}.auth-hero-body p{font-size:12px}.auth-features{display:none}.auth-hero-foot{display:none}.auth-form-side{padding:48px 24px}.auth-panel h2{font-size:26px}}
 body.auth-open{overflow:hidden}
+
+/* Email / password access screens */
+.account-form{display:grid;gap:14px;margin-top:16px}
+.account-field{display:grid;gap:7px;color:#365568;font-size:12px;font-weight:750}
+.account-field input{display:block;width:100%;padding:13px 14px;border-radius:11px;border:1px solid #d8e4eb;background:#fff;color:#1c3545;font-size:15px}
+.account-field input:focus{outline:3px solid #b0ded8;outline-offset:1px;border-color:#39a18f}
+.account-submit{width:100%;margin-top:7px}
+.account-links{display:flex;gap:12px;flex-wrap:wrap;justify-content:space-between;margin:15px 0}
+.account-links button{border:0;background:transparent;padding:4px;color:#167f71;font-size:12px;font-weight:750;text-decoration:underline;cursor:pointer}
+.auth-info{padding:13px 15px;background:#eef8f5;border:1px solid #cfeadf;color:#235e50;border-radius:12px;font-size:12px;line-height:1.7;margin-bottom:15px}
+.auth-info[hidden],.account-field[hidden],.auth-transfer[hidden],.account-form[hidden],.account-links[hidden]{display:none!important}
+.auth-guest-button[hidden]{display:none!important}
+body.account-loading .main{pointer-events:none;opacity:.12}
+@media(max-width:690px){.auth-form-side{padding:32px 22px 45px}.auth-hero{min-height:190px}.auth-hero-body{margin:20px 0}.auth-hero-body p{margin-bottom:4px}}

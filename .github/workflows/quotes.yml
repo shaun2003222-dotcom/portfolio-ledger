@@ -51,7 +51,7 @@ jobs:
       - name: 準備公開網站檔案（只公開必要檔案）
         run: |
           mkdir -p dist/quotes
-          cp index.html style.css app.js navigation.js account.js firebase-config.js dist/
+          cp index.html style.css app.js navigation.js account.js supabase-config.js dist/
           cp quotes/market.json dist/quotes/market.json
       - name: 打包靜態網站
         uses: actions/upload-pages-artifact@v3

@@ -6,16 +6,14 @@
 <meta name="description" content="多資產持倉管理、年度資產目標、資產配置分析與台股官方收盤行情">
 <title>持倉日誌｜多資產管理、配置健檢與自動幣價</title>
 <link rel="stylesheet" href="style.css">
-<!-- Firebase configuration is optional. Guest mode works without it. -->
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js" defer></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js" defer></script>
-<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js" defer></script>
-<script src="firebase-config.js" defer></script>
+<!-- Supabase Free: public URL + publishable key only; never service_role. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js" defer></script>
+<script src="supabase-config.js" defer></script>
 <script src="account.js" defer></script>
 <script src="app.js" defer></script>
 <script src="navigation.js" defer></script>
 </head>
-<body>
+<body class="account-loading auth-open">
 <div class="layout">
 <aside class="sidebar">
   <a class="logo" href="./"><span class="logo-mark">◈</span><span><b>持倉日誌</b><small>PORTFOLIO LEDGER</small></span></a>
@@ -32,7 +30,7 @@
     <button id="openAccount" class="sidebar-account-button" type="button">登入</button>
   </div>
   <div class="aside-foot"><div class="connection"><span class="live-dot"></span> <span id="storageMode">訪客本機儲存</span></div>
-    <p>登入後可使用私人雲端同步（需完成 Firebase 設定）。訪客模式資料僅在本機，記得匯出備份。</p></div>
+    <p>使用 Email＋密碼登入後，透過 Supabase 免費資料庫同步私人持倉。訪客模式只存在本機。</p></div>
 </aside>
 <main class="main">
 <header class="topbar" id="overview">
@@ -113,7 +111,7 @@
 </section>
 <section class="bottom-row page-view" data-page="overview" hidden>
   <article class="mini-panel"><span class="mini-icon">ℹ</span><div><b>計算規則</b><p>台股／台灣 ETF 採官方最近交易日收盤價；美股、基金、支援的加密貨幣由 CoinGecko 自動報價；未支援幣種和其他資產價格需自行輸入；匯率由外部來源自動帶入，失敗時可輸入備援值。無有效估值的標的不會算作 0。期貨名目價值僅顯示曝險，不列入總資產或圓餅圖。</p></div></article>
-  <article class="mini-panel"><span class="mini-icon">⇅</span><div><b>私人資料備份</b><p>訪客資料只在本機；啟用 Google 登入與 Firestore 後，個人持倉與目標可雲端同步。建議定期匯出備份。</p><div class="backup-actions"><button type="button" class="inline-button" id="exportData">匯出 JSON</button><button type="button" class="inline-button" id="importButton">匯入 JSON</button></div></div></article>
+  <article class="mini-panel"><span class="mini-icon">⇅</span><div><b>私人資料備份</b><p>訪客資料只在本機；以 Email＋密碼登入並驗證信箱後，個人資料可同步到 Supabase。建議定期匯出備份。</p><div class="backup-actions"><button type="button" class="inline-button" id="exportData">匯出 JSON</button><button type="button" class="inline-button" id="importButton">匯入 JSON</button></div></div></article>
 </section>
 <input type="file" id="importFile" accept=".json,application/json" hidden>
 <footer>持倉日誌 · 多資產記帳、年度目標及配置試算 · 非個別投資標的推薦，不含交易費、股利與稅務。</footer>
@@ -141,8 +139,8 @@
  <div class="dialog-actions"><button type="button" class="button secondary" id="cancelDialog">取消</button><button type="submit" class="button primary" id="submitHolding">儲存資產</button></div>
  </form>
 </dialog>
-<!-- First-visit login screen; Google login is real only after Firebase has been configured. -->
-<section class="auth-gate" id="authGate" hidden aria-label="登入介面" role="dialog" aria-modal="true">
+<!-- Email/password account screen; Supabase configuration required for online accounts. -->
+<section class="auth-gate" id="authGate" aria-label="登入介面" role="dialog" aria-modal="true">
   <div class="auth-hero">
     <div class="auth-brand"><span class="logo-mark">◈</span> 持倉日誌 <small>PORTFOLIO LEDGER</small></div>
     <div class="auth-hero-body"><div class="eyebrow">YOUR PORTFOLIO, YOUR SPACE</div>
@@ -154,16 +152,27 @@
   </div>
   <div class="auth-form-side">
     <button id="closeAuth" class="auth-close" type="button" aria-label="關閉登入視窗">✕</button>
-    <div class="auth-panel"><span class="auth-kicker">WELCOME BACK</span><h2 id="authHeading">登入持倉日誌</h2>
-      <p class="auth-lead" id="authLead">Google 帳號登入後，可以使用私人雲端儲存。尚未設定登入時，也可以直接以訪客身分使用。</p>
+    <div class="auth-panel"><span class="auth-kicker">YOUR PRIVATE PORTFOLIO</span><h2 id="authHeading">登入持倉日誌</h2>
+      <p class="auth-lead" id="authLead">使用 Email 與密碼登入；每個帳號都有獨立的私人持倉。</p>
       <div id="authUserCard" class="auth-user-card" hidden></div>
-      <div class="auth-error" id="authError" role="status" aria-live="polite" hidden></div>
-      <button id="googleLogin" class="auth-google-button" type="button"><span class="google-g" aria-hidden="true">G</span> 使用 Google 帳號登入</button>
-      <button id="guestContinue" class="auth-guest-button" type="button">以訪客身分繼續使用</button>
-      <div class="auth-transfer" id="authTransfer" hidden><b>首次登入：選擇資料來源</b><p>偵測到本機訪客持倉。要將原本資料複製到此帳號的私人雲端嗎？</p><button type="button" id="migrateGuest" class="button primary">將訪客資料複製到雲端</button><button type="button" id="startCloudFresh" class="button secondary">建立空白雲端資料</button></div>
-      <button id="signOut" class="auth-guest-button" type="button" hidden>登出 Google 帳號</button>
-      <p class="auth-setup-note" id="authSetupNote">Google 登入需要先在 Firebase 啟用 Authentication、Firestore 和網域授權。未設定前訪客模式可正常使用。</p>
-      <div class="auth-privacy">本站不會替你下單。訪客資料存於瀏覽器；登入資料依你的 Firebase 安全規則分隔儲存。</div>
+      <div class="auth-error" id="authError" role="alert" aria-live="polite" hidden></div>
+      <div class="auth-info" id="authInfo" role="status" aria-live="polite" hidden></div>
+      <form id="authForm" class="account-form" autocomplete="on">
+        <label class="account-field"><span>電子郵件 Email</span><input type="email" id="authEmail" autocomplete="email" required placeholder="your@email.com" maxlength="254"></label>
+        <label class="account-field" id="authPasswordWrap"><span>密碼</span><input type="password" id="authPassword" autocomplete="current-password" required minlength="8" placeholder="至少 8 個字元"></label>
+        <label class="account-field" id="authConfirmWrap" hidden><span>再次輸入密碼</span><input type="password" id="authConfirm" autocomplete="new-password" minlength="8" placeholder="再次確認密碼"></label>
+        <button class="button primary account-submit" id="authSubmit" type="submit">登入</button>
+      </form>
+      <div id="authLinks" class="account-links">
+        <button id="switchRegister" type="button">註冊新帳號</button>
+        <button id="switchReset" type="button">忘記密碼？</button>
+        <button id="switchLogin" type="button" hidden>返回登入</button>
+      </div>
+      <div class="auth-transfer" id="authTransfer" hidden><b>首次登入：選擇資料來源</b><p>你目前瀏覽器還有訪客持倉。是否複製到這個帳號的私人雲端？同步成功後會清除此瀏覽器的訪客副本，建議先匯出 JSON 備份。</p><button type="button" id="migrateGuest" class="button primary">將訪客資料複製到我的雲端</button><button type="button" id="startCloudFresh" class="button secondary">建立空白個人雲端</button></div>
+      <button id="signOut" class="auth-guest-button" type="button" hidden>登出此帳號</button>
+      <button id="guestContinue" class="auth-guest-button" type="button">以訪客身分使用（僅儲存於此瀏覽器）</button>
+      <p class="auth-setup-note" id="authSetupNote">雲端登入須先設定 Supabase Free 的 Auth、資料表與 RLS，再填入 supabase-config.js。</p>
+      <div class="auth-privacy">本站不會替你下單。請勿在公開 GitHub 上傳私人持倉備份、密碼或 Supabase service_role 金鑰。帳戶資料由 RLS 隔離。</div>
     </div>
   </div>
 </section>

@@ -537,5 +537,9 @@ window.PortfolioApp = {
     readSaved();
     try{const budget=localStorage.getItem(ADVICE_BUDGET_KEY);if(budget&&Number(budget)>0)$('adviceBudget').value=budget;}catch{}
     fillGoalForm();render();
+  },
+  clearVisitorData: () => {
+    // Only call AFTER confirmed cloud import, to avoid exposing guest holdings after logout.
+    try{localStorage.removeItem(STORAGE_KEY);localStorage.removeItem(GOAL_KEY);localStorage.removeItem(ADVICE_BUDGET_KEY);}catch{}
   }
 };
