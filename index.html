@@ -1,114 +1,109 @@
 <!doctype html>
 <html lang="zh-Hant">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="theme-color" content="#111f35" />
-  <meta name="description" content="簡單持倉管理、自動更新最新可取得的台股收盤價" />
-  <title>持倉日誌｜自動股價與損益</title>
-  <link rel="stylesheet" href="style.css" />
-  <script src="app.js" defer></script>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#11243a">
+<meta name="description" content="多資產持倉管理、年度資產目標、資產配置分析與台股官方收盤行情">
+<title>持倉日誌｜多資產管理與年度目標</title>
+<link rel="stylesheet" href="style.css"><script src="app.js" defer></script>
 </head>
 <body>
-  <div class="layout">
-    <aside class="sidebar">
-      <a class="logo" href="./" aria-label="持倉日誌首頁">
-        <span class="logo-mark">◈</span>
-        <span><b>持倉日誌</b><small>PORTFOLIO LEDGER</small></span>
-      </a>
-      <div class="aside-heading">工作空間</div>
-      <div class="nav-selected"><span class="nav-symbol">▦</span> 我的持倉 <span class="nav-chip">首頁</span></div>
-      <div class="aside-foot">
-        <div class="connection"><span class="live-dot"></span> 本機私人儲存</div>
-        <p>無需 Google 登入。持股資料只存在這台裝置的瀏覽器，GitHub 上不會公開你的持倉。</p>
-      </div>
-    </aside>
-
-    <main class="main">
-      <header class="topbar">
-        <div>
-          <div class="eyebrow">MY INVESTMENTS / 持倉管理</div>
-          <h1>我的投資持倉</h1>
-          <p class="subheading">輸入代號、股數與成本，其餘交給自動報價。</p>
-        </div>
-        <div class="head-buttons">
-          <button class="button secondary" id="refreshQuotes" type="button"><span aria-hidden="true">↻</span> 更新股價</button>
-          <button class="button primary" id="newHolding" type="button"><span aria-hidden="true">＋</span> 新增持股</button>
-        </div>
-      </header>
-      <div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
-      <section class="stats" aria-label="投資總覽">
-        <article class="stat">
-          <div class="stat-label">已取得報價的總市值 <span class="muted-icon">↗</span></div>
-          <div class="stat-number" id="totalValue">NT$ —</div>
-          <p class="stat-note" id="totalNote">正在載入持倉</p>
-        </article>
-        <article class="stat">
-          <div class="stat-label">未實現損益</div>
-          <div class="stat-number" id="totalPnl">NT$ —</div>
-          <p class="stat-note" id="pnlNote">依買進均價計算，不含交易費</p>
-        </article>
-        <article class="stat">
-          <div class="stat-label">持有標的</div>
-          <div class="stat-number" id="holdingCount">0 <span class="stat-unit">檔</span></div>
-          <p class="stat-note">台灣上市、上櫃股票及 ETF</p>
-        </article>
-      </section>
-
-      <section class="content-card" aria-label="持倉列表">
-        <div class="card-heading">
-          <div>
-            <h2>持倉明細</h2>
-            <p>自動帶入最新收盤價；未取得資料的股票不會拿 0 元冒充股價。</p>
-          </div>
-          <div class="quote-info"><span id="quoteDot" class="status-dot"></span><span id="quoteStatus">正在確認行情資料…</span></div>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr><th>股票／ETF</th><th>持有股數</th><th>平均買進成本</th><th>自動股價</th><th>目前市值</th><th>未實現損益</th><th class="actions-title">操作</th></tr></thead>
-            <tbody id="holdingsBody"><tr><td colspan="7" class="empty-cell">正在載入…</td></tr></tbody>
-          </table>
-        </div>
-        <div class="table-footer"><span id="lastSaved">資料保存在本機</span><span>資料來源：臺灣證券交易所／櫃買中心 OpenAPI</span></div>
-      </section>
-
-      <section class="bottom-row">
-        <article class="mini-panel">
-          <span class="mini-icon" aria-hidden="true">◷</span>
-          <div><b>報價說明</b><p>資料是最近交易日的收盤價，不是即時盤中成交價。假日與盤中可能仍顯示上一交易日；請查看每檔標示的日期。</p></div>
-        </article>
-        <article class="mini-panel">
-          <span class="mini-icon" aria-hidden="true">⇅</span>
-          <div><b>資料備份</b><p>換電腦時請先匯出檔案，再到新裝置匯入。</p>
-            <div class="backup-actions"><button class="inline-button" id="exportData" type="button">匯出 JSON</button><button class="inline-button" id="importButton" type="button">匯入備份</button></div>
-          </div>
-        </article>
-      </section>
-      <input type="file" id="importFile" accept=".json,application/json" hidden />
-      <footer>持倉日誌 · 個人投資追蹤工具 · 報價不保證即時；不構成投資建議。</footer>
-    </main>
-  </div>
-
-  <dialog id="holdingDialog" aria-labelledby="dialogTitle">
-    <form id="holdingForm" novalidate>
-      <div class="dialog-top"><div><div class="eyebrow">POSITION DETAILS</div><h2 id="dialogTitle">新增持股</h2></div><button type="button" id="closeDialog" class="close" aria-label="關閉">✕</button></div>
-      <div class="dialog-body">
-        <input type="hidden" id="holdingId" />
-        <div class="input-grid">
-          <label class="field full"><span>股票代號 <em>*</em></span><input id="symbol" required maxlength="12" placeholder="例如 0050、2330、6488" inputmode="text" autocomplete="off" /><small>輸入後自動從市場行情資料查詢，不必輸入現在股價。</small></label>
-          <label class="field"><span>交易市場 <em>*</em></span><select id="market"><option value="TWSE">上市（證交所）</option><option value="TPEX">上櫃（櫃買中心）</option></select></label>
-          <label class="field"><span>持股名稱（選填）</span><input id="holdingName" maxlength="70" placeholder="可留空，自動帶入名稱" /></label>
-          <label class="field"><span>持有股數 <em>*</em></span><input type="number" id="quantity" required min="0.000001" step="any" placeholder="例如 100" /></label>
-          <label class="field"><span>平均買進成本（每股） <em>*</em></span><input type="number" id="cost" required min="0" step="any" placeholder="例如 55.5" /></label>
-        </div>
-        <div class="quote-preview" aria-live="polite">
-          <div><span class="preview-label">自動取得的最新收盤價</span><strong id="previewPrice">請輸入股票代號</strong></div>
-          <small id="previewInfo">報價取自官方每日行情。</small>
-        </div>
-        <p class="form-error" id="formError" role="alert"></p>
-      </div>
-      <div class="dialog-actions"><button type="button" class="button secondary" id="cancelDialog">取消</button><button type="submit" class="button primary" id="submitHolding">儲存持倉</button></div>
-    </form>
-  </dialog>
-</body>
-</html>
+<div class="layout">
+<aside class="sidebar">
+  <a class="logo" href="./"><span class="logo-mark">◈</span><span><b>持倉日誌</b><small>PORTFOLIO LEDGER</small></span></a>
+  <div class="aside-heading">工作空間</div>
+  <nav aria-label="主要導覽" class="side-menu">
+    <a class="nav-selected" href="#overview"><span class="nav-symbol">▦</span> 資產總覽</a>
+    <a class="side-link" href="#holdings"><span class="nav-symbol">≡</span> 持倉管理</a>
+    <a class="side-link" href="#goals"><span class="nav-symbol">◎</span> 年度目標</a>
+  </nav>
+  <div class="aside-foot"><div class="connection"><span class="live-dot"></span> 私人瀏覽器儲存</div>
+    <p>持倉及目標僅存在目前瀏覽器，不會上傳到 GitHub。換裝置請先匯出 JSON 備份。</p></div>
+</aside>
+<main class="main">
+<header class="topbar" id="overview">
+  <div><div class="eyebrow">ASSET OVERVIEW / 投資健檢</div><h1>我的資產總覽</h1>
+  <p class="subheading">多類資產整合、官方台股收盤價及年度目標追蹤</p></div>
+  <div class="head-buttons"><button id="refreshQuotes" class="button secondary" type="button">↻ 更新股價</button><button id="newHolding" class="button primary" type="button">＋ 新增資產</button></div>
+</header>
+<div id="notice" class="notice" role="status" aria-live="polite" hidden></div>
+<section class="stats" aria-label="投資總覽">
+ <article class="stat"><div class="stat-label">已估值資產總額（TWD）</div><div class="stat-number" id="totalValue">NT$ 0</div><p class="stat-note" id="totalNote">待載入</p></article>
+ <article class="stat"><div class="stat-label">未實現損益（可估值資產）</div><div class="stat-number" id="totalPnl">—</div><p class="stat-note" id="pnlNote">不含費用及稅務</p></article>
+ <article class="stat"><div class="stat-label">年度目標進度</div><div class="stat-number" id="progressValue">尚未設定</div><p class="stat-note" id="progressNote">設定年度目標開始追蹤</p></article>
+ <article class="stat"><div class="stat-label">資產項目數</div><div class="stat-number" id="holdingCount">0 <span class="stat-unit">筆</span></div><p class="stat-note" id="holdingCountNote">跨類別記錄</p></article>
+</section>
+<section class="analysis-grid" aria-label="資產配置分析">
+  <article class="content-card allocation-card">
+    <div class="card-heading"><div><h2>資產配置</h2><p>依台幣換算後的已估值資產計算，不含期貨名目部位。</p></div></div>
+    <div class="allocation-wrap"><div class="pie-area"><div id="allocationPie" class="allocation-pie" role="img" aria-label="資產配置圖"><div class="pie-center"><span>已估值</span><strong id="pieTotal">NT$ 0</strong></div></div></div><div class="allocation-legend" id="allocationLegend"><p class="muted">新增持倉後自動產生比例。</p></div></div>
+  </article>
+  <article class="content-card target-card">
+    <div class="card-heading"><div><h2>年度資產目標</h2><p id="targetYearLabel">2026 年的資產累積目標</p></div><a href="#goals" class="text-link">調整目標 →</a></div>
+    <div class="target-overview"><div class="target-label">預定年底資產</div><div class="target-number" id="targetAmount">尚未設定</div><div class="meter" aria-label="目標達成率"><div id="targetBar" class="meter-fill"></div></div><p class="target-hint" id="targetHint">設定目標後，系統會計算目前進度。</p>
+    <div class="target-split"><div><small>年度投入目標</small><strong id="contributionGoalText">—</strong></div><div><small>已投入資金（手填）</small><strong id="contributionActualText">—</strong></div></div></div>
+  </article>
+</section>
+<section class="content-card category-section">
+  <div class="card-heading"><div><h2>資產分類概覽</h2><p>按資產類別呈現資產金額與配置比例；無報價或缺匯率的不列入估值。</p></div></div>
+  <div id="categoryCards" class="category-cards"></div>
+</section>
+<section class="content-card" id="holdings" aria-label="持倉明細">
+ <div class="card-heading"><div><h2>持倉管理</h2><p>台股可自動報價，其餘類別可設定手動價格與幣別。</p></div>
+ <div class="quote-info"><span id="quoteDot" class="status-dot"></span><span id="quoteStatus">讀取行情中…</span></div></div>
+ <div class="filters"><label for="categoryFilter">分類篩選</label><select id="categoryFilter"><option value="all">全部資產</option></select><span id="filteredCount" class="muted"></span></div>
+ <div class="table-wrap"><table><thead><tr><th>類別／標的</th><th>持有數量</th><th>平均成本</th><th>最新／手動單價</th><th>估值（台幣）</th><th>未實現損益</th><th class="actions-title">操作</th></tr></thead>
+ <tbody id="holdingsBody"><tr><td colspan="7" class="empty-cell">載入中…</td></tr></tbody></table></div>
+ <div class="table-footer"><span id="lastSaved">本機儲存</span><span id="missingNote">台股：臺灣證券交易所／櫃買中心盤後資料</span></div>
+</section>
+<section class="content-card goal-section" id="goals">
+  <div class="card-heading"><div><h2>年度目標設定與檢視</h2><p>設定總資產目標及各分類理想占比，檢查是否偏離計畫。這不是投資建議。</p></div></div>
+  <form id="goalForm" class="goal-form">
+    <div class="goal-inputs">
+      <label class="field"><span>目標年度</span><input id="goalYear" type="number" min="2020" max="2100" step="1" required></label>
+      <label class="field"><span>年底資產目標（新台幣）</span><input id="goalAmount" type="number" min="0" step="any" placeholder="例如 1000000"></label>
+      <label class="field"><span>本年度預計投入（新台幣）</span><input id="contributionGoal" type="number" min="0" step="any" placeholder="例如 120000"></label>
+      <label class="field"><span>今年已投入（新台幣）</span><input id="contributionActual" type="number" min="0" step="any" placeholder="自行更新投入額"></label>
+      <label class="field"><span>美元匯率 USD → TWD（手填）</span><input id="fxUSD" type="number" min="0" step="any" placeholder="例如 32.5"></label>
+      <label class="field"><span>歐元匯率 EUR → TWD（手填）</span><input id="fxEUR" type="number" min="0" step="any" placeholder="需要時填入"></label>
+      <label class="field"><span>日圓匯率 JPY → TWD（手填）</span><input id="fxJPY" type="number" min="0" step="any" placeholder="需要時填入"></label>
+      <label class="field"><span>USDT → TWD（手填）</span><input id="fxUSDT" type="number" min="0" step="any" placeholder="請勿假設與 USD 固定 1:1"></label>
+    </div>
+    <h3 class="goal-subhead">目標資產配置比例 <small>選填；有填時百分比合計須為 100%</small></h3>
+    <div id="targetPercentInputs" class="percent-grid"></div>
+    <p class="form-error" id="goalError" role="alert"></p>
+    <button class="button primary" type="submit">儲存年度目標</button>
+  </form>
+  <div class="goal-results"><h3>目標配置比較</h3><div id="goalComparison" class="goal-comparison muted">儲存目標比例後，這裡會顯示各類別的實際值與差距。</div></div>
+</section>
+<section class="bottom-row">
+  <article class="mini-panel"><span class="mini-icon">ℹ</span><div><b>計算規則</b><p>台股／台灣 ETF 採官方最近交易日收盤價；美股、基金、加密貨幣及其他資產價格與換匯率均需自行輸入。無有效估值的標的不會算作 0。期貨名目價值僅顯示曝險，不列入總資產或圓餅圖。</p></div></article>
+  <article class="mini-panel"><span class="mini-icon">⇅</span><div><b>私人資料備份</b><p>所有持倉、年度目標與匯率保存在當前瀏覽器；不同裝置需要手動匯入備份。</p><div class="backup-actions"><button type="button" class="inline-button" id="exportData">匯出 JSON</button><button type="button" class="inline-button" id="importButton">匯入 JSON</button></div></div></article>
+</section>
+<input type="file" id="importFile" accept=".json,application/json" hidden>
+<footer>持倉日誌 · 多資產記帳與年度目標 · 不包含交易費、股利、稅務或完整投資報酬率。</footer>
+</main></div>
+<dialog id="holdingDialog" aria-labelledby="dialogTitle">
+ <form id="holdingForm" novalidate>
+ <div class="dialog-top"><div><div class="eyebrow">ASSET DETAILS</div><h2 id="dialogTitle">新增資產</h2></div><button type="button" id="closeDialog" class="close" aria-label="關閉">✕</button></div>
+ <div class="dialog-body"><input type="hidden" id="holdingId">
+   <div class="input-grid">
+     <label class="field"><span>資產分類 <em>*</em></span><select id="category" required></select></label>
+     <label class="field"><span>報價方式</span><select id="market"><option value="TWSE">台灣上市（官方自動）</option><option value="TPEX">台灣上櫃（官方自動）</option><option value="MANUAL">自行輸入價格</option></select></label>
+     <label class="field"><span>標的代號</span><input id="symbol" maxlength="28" placeholder="0050、AAPL、BTC 等" autocomplete="off"><small>自動報價需使用有效台股代號；手動報價可自行命名。</small></label>
+     <label class="field"><span>資產名稱</span><input id="holdingName" maxlength="70" placeholder="例如 台積電、比特幣、某某基金"></label>
+     <label class="field"><span id="quantityLabel">股數／單位數 <em>*</em></span><input type="number" id="quantity" required min="0.000001" step="any" placeholder="例如 100"></label>
+     <label class="field cost-field"><span>平均買進成本（每單位）</span><input id="cost" type="number" required min="0" step="any" placeholder="例如 55"></label>
+     <label class="field" id="manualPriceField"><span>目前單價（手動更新）</span><input id="manualPrice" type="number" min="0" step="any" placeholder="例如 180"></label>
+     <label class="field"><span>計價幣別</span><select id="currency"><option value="TWD">TWD 新台幣</option><option value="USD">USD 美元</option><option value="EUR">EUR 歐元</option><option value="JPY">JPY 日圓</option><option value="USDT">USDT</option></select></label>
+     <label class="field futures-only"><span>期貨方向</span><select id="direction"><option value="long">多單</option><option value="short">空單</option></select></label>
+     <label class="field futures-only"><span>合約乘數</span><input id="multiplier" type="number" min="0.000001" step="any" value="1"><small>每一價格點對應的貨幣金額</small></label>
+     <label class="field futures-only"><span>每口保證金（參考資訊）</span><input id="margin" type="number" min="0" step="any" placeholder="不列入資產總額"></label>
+   </div>
+   <div class="quote-preview" aria-live="polite"><div><span class="preview-label">目前使用的價格</span><strong id="previewPrice">請輸入代號</strong></div><small id="previewInfo">台股會依官方報價更新；其他類別使用手動價格。</small></div>
+   <p class="form-error" id="formError" role="alert"></p>
+ </div>
+ <div class="dialog-actions"><button type="button" class="button secondary" id="cancelDialog">取消</button><button type="submit" class="button primary" id="submitHolding">儲存資產</button></div>
+ </form>
+</dialog>
+</body></html>
